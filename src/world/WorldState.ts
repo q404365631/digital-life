@@ -1,6 +1,5 @@
-import { WorldData, Weather, EnvironmentObject, EnvironmentObjectType, Position } from '../types';
+import { WorldData, Weather, EnvironmentObject, Position, GraveStone, Species } from '../types';
 import { MAP_COLS, MAP_ROWS, TILE_SIZE } from '../constants';
-import { createTileMap } from './TileMap';
 
 function generateId(): string {
   return `env_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
@@ -9,27 +8,27 @@ function generateId(): string {
 function createEnvironmentObjects(): EnvironmentObject[] {
   const objects: EnvironmentObject[] = [];
 
-  // Trees around the border
+  // Natural tree clusters (small groups, not a border wall)
   const treePositions: Position[] = [
+    // Top-left cluster (3 trees)
     { x: 1 * TILE_SIZE, y: 1 * TILE_SIZE },
     { x: 3 * TILE_SIZE, y: 0 * TILE_SIZE },
-    { x: 6 * TILE_SIZE, y: 1 * TILE_SIZE },
-    { x: 10 * TILE_SIZE, y: 0 * TILE_SIZE },
-    { x: 14 * TILE_SIZE, y: 1 * TILE_SIZE },
-    { x: 18 * TILE_SIZE, y: 0 * TILE_SIZE },
-    { x: 22 * TILE_SIZE, y: 1 * TILE_SIZE },
-    { x: 26 * TILE_SIZE, y: 0 * TILE_SIZE },
-    { x: 28 * TILE_SIZE, y: 1 * TILE_SIZE },
-    { x: 0 * TILE_SIZE, y: 5 * TILE_SIZE },
-    { x: 0 * TILE_SIZE, y: 10 * TILE_SIZE },
-    { x: 0 * TILE_SIZE, y: 15 * TILE_SIZE },
-    { x: 29 * TILE_SIZE, y: 5 * TILE_SIZE },
-    { x: 29 * TILE_SIZE, y: 12 * TILE_SIZE },
-    { x: 29 * TILE_SIZE, y: 17 * TILE_SIZE },
-    { x: 2 * TILE_SIZE, y: 18 * TILE_SIZE },
-    { x: 8 * TILE_SIZE, y: 19 * TILE_SIZE },
-    { x: 20 * TILE_SIZE, y: 18 * TILE_SIZE },
-    { x: 25 * TILE_SIZE, y: 19 * TILE_SIZE },
+    { x: 2 * TILE_SIZE, y: 3 * TILE_SIZE },
+    // Top-right cluster (2 trees)
+    { x: 26 * TILE_SIZE, y: 1 * TILE_SIZE },
+    { x: 28 * TILE_SIZE, y: 2 * TILE_SIZE },
+    // Along the path (sparse)
+    { x: 8 * TILE_SIZE, y: 6 * TILE_SIZE },
+    { x: 10 * TILE_SIZE, y: 12 * TILE_SIZE },
+    // Near the stream
+    { x: 20 * TILE_SIZE, y: 4 * TILE_SIZE },
+    { x: 21 * TILE_SIZE, y: 14 * TILE_SIZE },
+    // Bottom-right cluster (2 trees)
+    { x: 25 * TILE_SIZE, y: 17 * TILE_SIZE },
+    { x: 27 * TILE_SIZE, y: 16 * TILE_SIZE },
+    // Solitary trees for variety
+    { x: 5 * TILE_SIZE, y: 14 * TILE_SIZE },
+    { x: 15 * TILE_SIZE, y: 2 * TILE_SIZE },
   ];
 
   for (const pos of treePositions) {
@@ -41,11 +40,13 @@ function createEnvironmentObjects(): EnvironmentObject[] {
     });
   }
 
-  // Rocks
+  // Rocks near the stream and path
   const rockPositions: Position[] = [
-    { x: 12 * TILE_SIZE, y: 14 * TILE_SIZE },
-    { x: 20 * TILE_SIZE, y: 6 * TILE_SIZE },
-    { x: 24 * TILE_SIZE, y: 16 * TILE_SIZE },
+    { x: 22 * TILE_SIZE, y: 8 * TILE_SIZE },   // near stream
+    { x: 23 * TILE_SIZE, y: 12 * TILE_SIZE },  // near stream
+    { x: 13 * TILE_SIZE, y: 9 * TILE_SIZE },   // near path
+    { x: 7 * TILE_SIZE, y: 16 * TILE_SIZE },   // bottom area
+    { x: 18 * TILE_SIZE, y: 18 * TILE_SIZE },  // bottom area
   ];
 
   for (const pos of rockPositions) {
@@ -64,7 +65,31 @@ export function createInitialWorldState(): WorldData {
   return {
     weather: 'sunny',
     environmentObjects: createEnvironmentObjects(),
-    tileMap: createTileMap(),
+    tileMap: [],
+    graveStones: [],
+  };
+}
+
+export function addGraveStone(
+  world: WorldData,
+  creatureName: string,
+  species: Species,
+  bornAt: number,
+  sourceFile: string,
+  position: Position,
+): WorldData {
+  const grave: GraveStone = {
+    id: generateId(),
+    creatureName,
+    species,
+    bornAt,
+    diedAt: Date.now(),
+    sourceFile,
+    position,
+  };
+  return {
+    ...world,
+    graveStones: [...world.graveStones, grave],
   };
 }
 
@@ -83,35 +108,6 @@ export function updateWeather(world: WorldData, bugCount: number): WorldData {
   }
 
   return { ...world, weather };
-}
-
-export function addBugToWorld(world: WorldData): WorldData {
-  const bugObj: EnvironmentObject = {
-    id: generateId(),
-    type: 'bug',
-    position: {
-      x: (2 + Math.floor(Math.random() * (MAP_COLS - 4))) * TILE_SIZE,
-      y: (2 + Math.floor(Math.random() * (MAP_ROWS - 4))) * TILE_SIZE,
-    },
-    opacity: 1,
-  };
-
-  return {
-    ...world,
-    environmentObjects: [...world.environmentObjects, bugObj],
-  };
-}
-
-export function removeBugsFromWorld(world: WorldData, targetCount: number): WorldData {
-  const bugs = world.environmentObjects.filter(o => o.type === 'bug');
-  const nonBugs = world.environmentObjects.filter(o => o.type !== 'bug');
-
-  const bugsToKeep = bugs.slice(0, targetCount);
-
-  return {
-    ...world,
-    environmentObjects: [...nonBugs, ...bugsToKeep],
-  };
 }
 
 export function setBugsInWorld(world: WorldData, count: number): WorldData {

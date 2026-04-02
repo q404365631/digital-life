@@ -1,6 +1,8 @@
-import { ExtToWebMessage, WebToExtMessage, CreatureData, WorldData } from '../../types';
+import { ExtToWebMessage, WebToExtMessage, CreatureData, AgentData, AgentType, WorldData } from '../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_DURATION } from '../../constants';
 import { GameRenderer } from './renderer/GameRenderer';
+import { SoundEngine } from './audio/SoundEngine';
+import { setLanguage, getLanguage, Language, t } from './i18n';
 
 // VSCode API
 interface VSCodeApi {
@@ -17,7 +19,23 @@ const vscode = acquireVsCodeApi();
 let creatures: readonly CreatureData[] = [];
 let worldData: WorldData | null = null;
 let bugCount = 0;
+let agents: readonly AgentData[] = [];
 let selectedCreatureId: string | null = null;
+const agentChats: Map<string, { message: string; timestamp: number }> = new Map();
+
+// Agent keyboard control
+let selectedAgentId: string | null = null;
+const keysPressed: Set<string> = new Set();
+
+// Smooth position interpolation
+const smoothPositions: Map<string, { x: number; y: number }> = new Map();
+
+function lerpPosition(current: { x: number; y: number }, target: { x: number; y: number }, factor: number): { x: number; y: number } {
+  return {
+    x: current.x + (target.x - current.x) * factor,
+    y: current.y + (target.y - current.y) * factor,
+  };
+}
 
 // Canvas setup
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -31,6 +49,7 @@ if (!ctx) {
 ctx.imageSmoothingEnabled = false;
 
 const renderer = new GameRenderer(ctx);
+const soundEngine = new SoundEngine();
 
 // ============================================================
 // Zoom & Pan State
@@ -42,7 +61,8 @@ let zoomLevel = 1.0;
 let panX = 0;
 let panY = 0;
 let isPanning = false;
-let isDraggingBread = false;
+type ActionMode = 'none' | 'feed' | 'diet' | 'cure' | 'wake';
+let actionMode: ActionMode = 'none';
 let panStartX = 0;
 let panStartY = 0;
 let panStartPanX = 0;
@@ -129,17 +149,48 @@ canvas.addEventListener('dblclick', () => {
   updateCanvasCursor();
 });
 
-// Left-click drag on canvas to pan (when zoomed in)
+// Left-click drag on canvas: creature drag or pan
 canvas.addEventListener('pointerdown', (event: PointerEvent) => {
-  // Any mouse button can pan when zoomed in, but only if not dragging bread
-  if (event.button === 0 && zoomLevel > 1.01 && !isDraggingBread) {
-    isPanning = true;
-    panStartX = event.clientX;
-    panStartY = event.clientY;
-    panStartPanX = panX;
-    panStartPanY = panY;
-    canvas.setPointerCapture(event.pointerId);
-    updateCanvasCursor();
+  if (event.button === 0 && actionMode === 'none') {
+    // Check if clicking on a creature (for drag)
+    const worldPos = screenToWorld(event.clientX, event.clientY);
+    const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
+
+    if (targetId) {
+      // Start dragging creature
+      draggingCreatureId = targetId;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragMoved = false;
+      dragOverridePositions.set(targetId, { x: worldPos.x, y: worldPos.y });
+      canvas.classList.add('dragging-creature');
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    // Check if clicking on an agent (for drag)
+    const agentId = findAgentAtCanvasPos(worldPos.x, worldPos.y);
+    if (agentId) {
+      draggingAgentId = agentId;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragMoved = false;
+      dragOverridePositions.set(agentId, { x: worldPos.x, y: worldPos.y });
+      canvas.classList.add('dragging-creature');
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    // No creature or agent found: pan if zoomed in
+    if (zoomLevel > 1.01) {
+      isPanning = true;
+      panStartX = event.clientX;
+      panStartY = event.clientY;
+      panStartPanX = panX;
+      panStartPanY = panY;
+      canvas.setPointerCapture(event.pointerId);
+      updateCanvasCursor();
+    }
   } else if (event.button === 1 || event.button === 2) {
     event.preventDefault();
     isPanning = true;
@@ -154,7 +205,41 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
 
 let panMoved = false;
 
+// ============================================================
+// Drag & Drop State (creatures + agents)
+// ============================================================
+let draggingCreatureId: string | null = null;
+let draggingAgentId: string | null = null;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragMoved = false;
+const dragOverridePositions: Map<string, { x: number; y: number }> = new Map();
+
 canvas.addEventListener('pointermove', (event: PointerEvent) => {
+  // Handle creature dragging
+  if (draggingCreatureId) {
+    const worldPos = screenToWorld(event.clientX, event.clientY);
+    dragOverridePositions.set(draggingCreatureId, { x: worldPos.x, y: worldPos.y });
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      dragMoved = true;
+    }
+    return;
+  }
+
+  // Handle agent dragging
+  if (draggingAgentId) {
+    const worldPos = screenToWorld(event.clientX, event.clientY);
+    dragOverridePositions.set(draggingAgentId, { x: worldPos.x, y: worldPos.y });
+    const dx = event.clientX - dragStartX;
+    const dy = event.clientY - dragStartY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      dragMoved = true;
+    }
+    return;
+  }
+
   if (!isPanning) {
     return;
   }
@@ -172,6 +257,34 @@ canvas.addEventListener('pointermove', (event: PointerEvent) => {
 });
 
 canvas.addEventListener('pointerup', (event: PointerEvent) => {
+  // Handle creature drop
+  if (draggingCreatureId) {
+    const override = dragOverridePositions.get(draggingCreatureId);
+    if (override && dragMoved) {
+      vscode.postMessage({ type: 'moveCreature', creatureId: draggingCreatureId, position: override });
+    }
+    dragOverridePositions.delete(draggingCreatureId);
+    draggingCreatureId = null;
+    dragMoved = false;
+    canvas.classList.remove('dragging-creature');
+    canvas.releasePointerCapture(event.pointerId);
+    return;
+  }
+
+  // Handle agent drop
+  if (draggingAgentId) {
+    const override = dragOverridePositions.get(draggingAgentId);
+    if (override && dragMoved) {
+      vscode.postMessage({ type: 'moveAgent', agentId: draggingAgentId, position: override });
+    }
+    dragOverridePositions.delete(draggingAgentId);
+    draggingAgentId = null;
+    dragMoved = false;
+    canvas.classList.remove('dragging-creature');
+    canvas.releasePointerCapture(event.pointerId);
+    return;
+  }
+
   if (isPanning) {
     isPanning = false;
     canvas.releasePointerCapture(event.pointerId);
@@ -184,13 +297,16 @@ canvas.addEventListener('contextmenu', (event: Event) => {
   event.preventDefault();
 });
 
-// UI elements
-const creatureCountEl = document.getElementById('creature-count');
-const btnPet = document.getElementById('btn-pet');
-const breadSource = document.getElementById('bread-source');
-const breadDrag = document.getElementById('bread-drag');
-const breadEffect = document.getElementById('bread-effect');
-const gameContainer = document.getElementById('game-container');
+// UI elements (toolbar - separate from canvas, no event interference)
+const statusText = document.getElementById('status-text');
+const btnFeed = document.getElementById('btn-feed');
+const btnDiet = document.getElementById('btn-diet');
+const btnCure = document.getElementById('btn-cure');
+const btnWake = document.getElementById('btn-wake');
+const btnMute = document.getElementById('btn-mute');
+const btnLang = document.getElementById('btn-lang');
+const feedIndicator = document.getElementById('feed-mode-indicator');
+const eduMessage = document.getElementById('edu-message');
 
 // Message handling
 window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
@@ -201,8 +317,9 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       creatures = message.creatures;
       worldData = message.world;
       bugCount = message.bugs;
-      if (creatureCountEl) {
-        creatureCountEl.textContent = String(creatures.length);
+      agents = message.agents ?? [];
+      if (statusText) {
+        statusText.textContent = `Lives: ${creatures.length}`;
       }
       // Auto-select first creature if none selected
       if (!selectedCreatureId && creatures.length > 0) {
@@ -211,10 +328,12 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
 
     case 'creatureBorn':
+      soundEngine.playHatch();
       // Will be handled via next worldUpdate
       break;
 
     case 'creatureDied':
+      soundEngine.playDeath();
       if (selectedCreatureId === message.creatureId) {
         selectedCreatureId = creatures.length > 0 ? creatures[0].id : null;
       }
@@ -222,19 +341,36 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'commitDetected':
       renderer.triggerCommitEffect();
+      soundEngine.playCommit();
       break;
 
     case 'bugCountChanged':
       bugCount = message.count;
       break;
+
+    case 'agentChat': {
+      const agentChatBubble = document.getElementById('chat-bubble');
+      if (agentChatBubble) {
+        const chatAgent = agents.find(a => a.id === message.agentId);
+        const name = chatAgent?.name ?? 'Agent';
+        agentChatBubble.textContent = `${name}: ${message.message}`;
+      }
+      agentChats.set(message.agentId, { message: message.message, timestamp: Date.now() });
+      break;
+    }
   }
 });
 
-// Click handling on canvas for creature selection
+// Click handling on canvas for creature selection and feed mode
 canvas.addEventListener('click', (event: MouseEvent) => {
   // Skip if we were panning (drag, not click)
   if (panMoved) {
     panMoved = false;
+    return;
+  }
+  // Skip if we just finished dragging a creature
+  if (dragMoved) {
+    dragMoved = false;
     return;
   }
   panMoved = false;
@@ -242,41 +378,143 @@ canvas.addEventListener('click', (event: MouseEvent) => {
   const worldPos = screenToWorld(event.clientX, event.clientY);
 
   // Find closest creature to click (in world coordinates)
-  let closestId: string | null = null;
-  let closestDist = 32;
+  const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
 
-  for (const creature of creatures) {
-    const dx = creature.position.x - worldPos.x;
-    const dy = creature.position.y - worldPos.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestId = creature.id;
+  if (actionMode !== 'none') {
+    if (targetId) {
+      const creature = creatures.find(c => c.id === targetId);
+      if (creature) {
+        handleAction(actionMode, creature);
+      }
+    }
+    setActionMode('none');
+    return;
+  }
+
+  if (targetId) {
+    selectedCreatureId = targetId;
+    return;
+  }
+
+  // Check agents (click = select + stop + open terminal)
+  for (const agent of agents) {
+    const dx = agent.position.x - worldPos.x;
+    const dy = agent.position.y - worldPos.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 32) {
+      selectedAgentId = agent.id;
+      renderer.setSelectedAgentId(agent.id);
+      vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
+      vscode.postMessage({ type: 'stopAgent', agentId: agent.id });
+      vscode.postMessage({ type: 'clickAgent', agentId: agent.id });
+      return;
+    }
+  }
+});
+
+// Keyboard controls
+document.addEventListener('keydown', (event: KeyboardEvent) => {
+  keysPressed.add(event.key);
+
+  // ESC key to cancel action mode or deselect agent
+  if (event.key === 'Escape') {
+    if (actionMode !== 'none') {
+      setActionMode('none');
+    } else if (selectedAgentId) {
+      selectedAgentId = null;
+      renderer.setSelectedAgentId(null);
     }
   }
 
-  if (closestId) {
-    selectedCreatureId = closestId;
-    updateActionPanel();
+  // Space key to toggle sit/stand
+  if (event.key === ' ' && selectedAgentId) {
+    event.preventDefault();
+    vscode.postMessage({ type: 'sitAgent', agentId: selectedAgentId, sitting: true });
   }
 });
 
-// Button handlers
-btnPet?.addEventListener('click', () => {
-  if (selectedCreatureId) {
-    vscode.postMessage({ type: 'action', action: 'pet', targetId: selectedCreatureId });
+document.addEventListener('keyup', (event: KeyboardEvent) => {
+  keysPressed.delete(event.key);
+});
+
+// Button handlers (toolbar buttons - completely outside canvas, no event interference)
+btnFeed?.addEventListener('click', () => setActionMode(actionMode === 'feed' ? 'none' : 'feed'));
+btnDiet?.addEventListener('click', () => setActionMode(actionMode === 'diet' ? 'none' : 'diet'));
+btnCure?.addEventListener('click', () => setActionMode(actionMode === 'cure' ? 'none' : 'cure'));
+btnWake?.addEventListener('click', () => setActionMode(actionMode === 'wake' ? 'none' : 'wake'));
+
+btnMute?.addEventListener('click', () => {
+  const newMuted = !soundEngine.isMuted();
+  soundEngine.setMuted(newMuted);
+  if (btnMute) {
+    btnMute.textContent = newMuted ? '\u{1F507}' : '\u{1F50A}';
+    btnMute.title = newMuted ? t('unmute') : t('mute');
   }
 });
 
-function updateActionPanel(): void {
-  const panel = document.getElementById('action-panel');
-  if (panel) {
-    panel.style.opacity = selectedCreatureId ? '1' : '0.5';
+const btnAddAgent = document.getElementById('btn-add-agent');
+btnAddAgent?.addEventListener('click', () => {
+  const types: AgentType[] = ['claude', 'cursor', 'copilot', 'custom'];
+  const nextType = types[agents.length % types.length];
+  vscode.postMessage({ type: 'addAgent', agentType: nextType });
+});
+
+const btnDelete = document.getElementById('btn-delete');
+btnDelete?.addEventListener('click', () => {
+  if (selectedAgentId) {
+    vscode.postMessage({ type: 'deleteAgent', agentId: selectedAgentId });
+    selectedAgentId = null;
+    renderer.setSelectedAgentId(null);
+  }
+});
+
+const btnClearAll = document.getElementById('btn-clear-all');
+btnClearAll?.addEventListener('click', () => {
+  vscode.postMessage({ type: 'clearAllCreatures' });
+  selectedCreatureId = null;
+});
+
+const roomNames = ['Room 1', 'Room 2', 'Room 3'];
+const btnRoom = document.getElementById('btn-room');
+btnRoom?.addEventListener('click', () => {
+  const next = (renderer.getBgIndex() + 1) % 3;
+  renderer.setBgIndex(next);
+  if (btnRoom) {
+    btnRoom.textContent = `\u{1F3E0} ${roomNames[next]}`;
+  }
+  vscode.setState({ ...(vscode.getState() as object ?? {}), roomIndex: next });
+});
+
+// Restore saved room
+const savedRoom = (vscode.getState() as { roomIndex?: number } | null)?.roomIndex;
+if (savedRoom !== undefined && savedRoom !== null) {
+  renderer.setBgIndex(savedRoom);
+  if (btnRoom) {
+    btnRoom.textContent = `\u{1F3E0} ${roomNames[savedRoom]}`;
   }
 }
 
+btnLang?.addEventListener('click', () => {
+  const newLang: Language = getLanguage() === 'en' ? 'ja' : 'en';
+  setLanguage(newLang);
+  if (btnLang) {
+    btnLang.textContent = newLang === 'en' ? '\u{1F310} EN' : '\u{1F310} JP';
+  }
+  // Update toolbar button labels for new language
+  const btnFeedEl = document.getElementById('btn-feed');
+  const btnDietEl = document.getElementById('btn-diet');
+  const btnCureEl = document.getElementById('btn-cure');
+  const btnWakeEl = document.getElementById('btn-wake');
+  const btnAddAgentEl = document.getElementById('btn-add-agent');
+  if (btnFeedEl) { btnFeedEl.textContent = `\u{1F35E} ${t('feed_label')}`; }
+  if (btnDietEl) { btnDietEl.textContent = `\u{1F52A} ${t('diet_label')}`; }
+  if (btnCureEl) { btnCureEl.textContent = `\u{1F48A} ${t('cure_label')}`; }
+  if (btnWakeEl) { btnWakeEl.textContent = `\u{23F0} ${t('wake_label')}`; }
+  if (btnAddAgentEl) { btnAddAgentEl.textContent = t('add_agent'); }
+  vscode.setState({ ...(vscode.getState() as object ?? {}), language: newLang });
+});
+
 // ============================================================
-// Bread Drag & Drop (using mouse events for VSCode Webview compatibility)
+// Action Mode (click action button -> click creature to act)
 // ============================================================
 
 function findCreatureAtCanvasPos(worldX: number, worldY: number): string | null {
@@ -296,93 +534,127 @@ function findCreatureAtCanvasPos(worldX: number, worldY: number): string | null 
   return closestId;
 }
 
-function showBreadEffect(clientX: number, clientY: number): void {
-  if (!breadEffect || !gameContainer) {
-    return;
+function findAgentAtCanvasPos(worldX: number, worldY: number): string | null {
+  let closestId: string | null = null;
+  let closestDist = 32;
+
+  for (const agent of agents) {
+    const dx = agent.position.x - worldX;
+    const dy = agent.position.y - worldY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestId = agent.id;
+    }
   }
-  const containerRect = gameContainer.getBoundingClientRect();
-  const localX = clientX - containerRect.left;
-  const localY = clientY - containerRect.top;
 
-  breadEffect.style.left = `${localX}px`;
-  breadEffect.style.top = `${localY}px`;
-  breadEffect.classList.remove('animate');
-  void breadEffect.offsetWidth;
-  breadEffect.classList.add('animate');
-
-  setTimeout(() => {
-    breadEffect.classList.remove('animate');
-  }, 500);
+  return closestId;
 }
 
-function onBreadMouseDown(event: MouseEvent): void {
-  event.preventDefault();
-  event.stopPropagation();
-  isDraggingBread = true;
+function setActionMode(mode: ActionMode): void {
+  actionMode = mode;
+  // Reset active class on all buttons
+  btnFeed?.classList.toggle('active', mode === 'feed');
+  btnDiet?.classList.toggle('active', mode === 'diet');
+  btnCure?.classList.toggle('active', mode === 'cure');
+  btnWake?.classList.toggle('active', mode === 'wake');
+  canvas.classList.toggle('feed-mode', mode !== 'none');
 
-  if (breadSource) {
-    breadSource.classList.add('dragging-active');
-  }
-  if (breadDrag && gameContainer) {
-    const containerRect = gameContainer.getBoundingClientRect();
-    breadDrag.style.left = `${event.clientX - containerRect.left}px`;
-    breadDrag.style.top = `${event.clientY - containerRect.top}px`;
-    breadDrag.classList.add('visible');
+  if (feedIndicator) {
+    feedIndicator.classList.toggle('hidden', mode === 'none');
+    if (mode === 'feed') {
+      feedIndicator.textContent = t('click_feed');
+    } else if (mode === 'diet') {
+      feedIndicator.textContent = t('click_diet');
+    } else if (mode === 'cure') {
+      feedIndicator.textContent = t('click_cure');
+    } else if (mode === 'wake') {
+      feedIndicator.textContent = t('click_wake');
+    }
   }
 
-  document.addEventListener('mousemove', onBreadMouseMove, true);
-  document.addEventListener('mouseup', onBreadMouseUp, true);
+  // Clear education message
+  hideEduMessage();
 }
 
-function onBreadMouseMove(event: MouseEvent): void {
-  if (!isDraggingBread || !breadDrag || !gameContainer) {
-    return;
-  }
-  event.preventDefault();
-  const containerRect = gameContainer.getBoundingClientRect();
-  breadDrag.style.left = `${event.clientX - containerRect.left}px`;
-  breadDrag.style.top = `${event.clientY - containerRect.top}px`;
-}
-
-function onBreadMouseUp(event: MouseEvent): void {
-  if (!isDraggingBread) {
-    return;
-  }
-  isDraggingBread = false;
-
-  if (breadSource) {
-    breadSource.classList.remove('dragging-active');
-  }
-  if (breadDrag) {
-    breadDrag.classList.remove('visible');
-  }
-
-  document.removeEventListener('mousemove', onBreadMouseMove, true);
-  document.removeEventListener('mouseup', onBreadMouseUp, true);
-
-  // Check if dropped on a creature
-  const worldPos = screenToWorld(event.clientX, event.clientY);
-  const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
-
-  if (targetId) {
-    vscode.postMessage({ type: 'action', action: 'feed', targetId });
-    selectedCreatureId = targetId;
-    updateActionPanel();
-    showBreadEffect(event.clientX, event.clientY);
+function showEduMessage(msg: string, isWrong: boolean = false): void {
+  if (eduMessage) {
+    eduMessage.textContent = msg;
+    eduMessage.classList.remove('hidden', 'wrong');
+    if (isWrong) {
+      eduMessage.classList.add('wrong');
+    }
+    // Auto-hide after 5 seconds
+    setTimeout(() => hideEduMessage(), 5000);
   }
 }
 
-// Also support click on bread to feed selected creature (fallback)
-function onBreadClick(event: MouseEvent): void {
-  event.stopPropagation();
-  if (selectedCreatureId) {
-    vscode.postMessage({ type: 'action', action: 'feed', targetId: selectedCreatureId });
-    showBreadEffect(event.clientX, event.clientY);
+function hideEduMessage(): void {
+  if (eduMessage) {
+    eduMessage.classList.add('hidden');
   }
 }
 
-breadSource?.addEventListener('mousedown', onBreadMouseDown);
-breadSource?.addEventListener('click', onBreadClick);
+function handleAction(mode: ActionMode, creature: CreatureData): void {
+  const health = creature.fileHealth ?? { lineCount: 0, bugCount: 0, lastModified: Date.now() };
+  const daysSince = Math.floor((Date.now() - health.lastModified) / (1000 * 60 * 60 * 24));
+
+  switch (mode) {
+    case 'feed':
+      vscode.postMessage({ type: 'action', action: 'feed', targetId: creature.id });
+      soundEngine.playFeed();
+      renderer.triggerFeedEffect(creature.position.x, creature.position.y);
+      showEduMessage(t('feed_msg'));
+      break;
+
+    case 'diet':
+      if (health.lineCount > 300) {
+        vscode.postMessage({ type: 'heal', action: 'diet', targetId: creature.id });
+        soundEngine.playFeed();
+        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
+        showEduMessage(t('diet_msg', { lines: health.lineCount }));
+      } else {
+        showEduMessage(t('diet_wrong', { lines: health.lineCount }), true);
+        soundEngine.playPet();
+      }
+      break;
+
+    case 'cure':
+      if (health.bugCount > 0) {
+        vscode.postMessage({ type: 'heal', action: 'cure', targetId: creature.id });
+        soundEngine.playFeed();
+        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
+        showEduMessage(t('cure_msg', { bugs: health.bugCount }));
+      } else {
+        showEduMessage(t('cure_wrong'), true);
+        soundEngine.playPet();
+      }
+      break;
+
+    case 'wake':
+      if (daysSince >= 3) {
+        vscode.postMessage({ type: 'heal', action: 'wake', targetId: creature.id });
+        soundEngine.playFeed();
+        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
+        showEduMessage(t('wake_msg', { days: daysSince }));
+      } else {
+        showEduMessage(t('wake_wrong'), true);
+        soundEngine.playPet();
+      }
+      break;
+  }
+
+  selectedCreatureId = creature.id;
+}
+
+// Restore saved language preference
+const savedLangState = vscode.getState() as { language?: Language } | null;
+if (savedLangState?.language) {
+  setLanguage(savedLangState.language);
+  if (btnLang) {
+    btnLang.textContent = savedLangState.language === 'en' ? '\u{1F310} EN' : '\u{1F310} JP';
+  }
+}
 
 // Game loop
 let lastTime = 0;
@@ -393,8 +665,60 @@ function gameLoop(timestamp: number): void {
   if (delta >= FRAME_DURATION) {
     lastTime = timestamp;
 
+    // Process keyboard input for agent movement
+    if (selectedAgentId) {
+      let kdx = 0;
+      let kdy = 0;
+      const MOVE_SPEED = 2;
+
+      if (keysPressed.has('ArrowLeft') || keysPressed.has('a') || keysPressed.has('A')) { kdx -= MOVE_SPEED; }
+      if (keysPressed.has('ArrowRight') || keysPressed.has('d') || keysPressed.has('D')) { kdx += MOVE_SPEED; }
+      if (keysPressed.has('ArrowUp') || keysPressed.has('w') || keysPressed.has('W')) { kdy -= MOVE_SPEED; }
+      if (keysPressed.has('ArrowDown') || keysPressed.has('s') || keysPressed.has('S')) { kdy += MOVE_SPEED; }
+
+      if (kdx !== 0 || kdy !== 0) {
+        vscode.postMessage({ type: 'moveAgentByKey', agentId: selectedAgentId, dx: kdx, dy: kdy });
+      }
+    }
+
     if (worldData) {
-      renderer.render(creatures, worldData, bugCount, zoomLevel, panX, panY);
+      // Clean up stale smooth positions
+      const activeIds = new Set([...creatures.map(c => c.id), ...agents.map(a => a.id)]);
+      for (const key of smoothPositions.keys()) {
+        if (!activeIds.has(key)) { smoothPositions.delete(key); }
+      }
+      for (const key of dragOverridePositions.keys()) {
+        if (!activeIds.has(key)) { dragOverridePositions.delete(key); }
+      }
+
+      // Smooth interpolation (factor 0.15 = smooth following)
+      const LERP_FACTOR = 0.15;
+
+      const smoothCreatures = creatures.map(c => {
+        const override = dragOverridePositions.get(c.id);
+        if (override) {
+          smoothPositions.set(c.id, override); // Instant follow during drag
+          return { ...c, position: override, targetPosition: null };
+        }
+        const current = smoothPositions.get(c.id) ?? { x: c.position.x, y: c.position.y };
+        const smoothed = lerpPosition(current, c.position, LERP_FACTOR);
+        smoothPositions.set(c.id, smoothed);
+        return { ...c, position: smoothed };
+      });
+
+      const smoothAgents = agents.map(a => {
+        const override = dragOverridePositions.get(a.id);
+        if (override) {
+          smoothPositions.set(a.id, override); // Instant follow during drag
+          return { ...a, position: override, targetPosition: null };
+        }
+        const current = smoothPositions.get(a.id) ?? { x: a.position.x, y: a.position.y };
+        const smoothed = lerpPosition(current, a.position, LERP_FACTOR);
+        smoothPositions.set(a.id, smoothed);
+        return { ...a, position: smoothed };
+      });
+
+      renderer.render(smoothCreatures, worldData, bugCount, zoomLevel, panX, panY, selectedCreatureId, draggingCreatureId, smoothAgents, agentChats);
     }
   }
 

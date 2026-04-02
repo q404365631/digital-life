@@ -1,12 +1,25 @@
-// ============================================================
-// Digital Life - Type Definitions
-// ============================================================
+// --- Coding DNA ---
 
-// --- Creature Types ---
+export interface CodingDNA {
+  readonly commitFrequency: number; // 0-1
+  readonly nightOwl: number;        // 0-1
+  readonly polyglot: number;        // 0-1
+  readonly velocity: number;        // 0-1
+  readonly consistency: number;     // 0-1
+}
+
+// --- File Health ---
+
+export interface FileHealth {
+  readonly lineCount: number;
+  readonly bugCount: number;
+  readonly lastModified: number; // epoch ms
+}
+
+// --- Creature ---
 
 export type Species = 'puff' | 'blob' | 'pip' | 'wisp' | 'chomp' | 'dot';
 export type CreatureStage = 'egg' | 'baby' | 'adult';
-
 export type CreatureMood = 'happy' | 'neutral' | 'sad';
 
 export type AnimationState =
@@ -49,9 +62,11 @@ export interface CreatureData {
   readonly species: Species;
   readonly exp: number;
   readonly level: number;
+  readonly dna: CodingDNA;
+  readonly fileHealth: FileHealth;
 }
 
-// --- World Types ---
+// --- World ---
 
 export type Weather = 'sunny' | 'cloudy' | 'rainy';
 
@@ -73,13 +88,24 @@ export interface EnvironmentObject {
   readonly opacity: number;
 }
 
+export interface GraveStone {
+  readonly id: string;
+  readonly creatureName: string;
+  readonly species: Species;
+  readonly bornAt: number;
+  readonly diedAt: number;
+  readonly sourceFile: string;
+  readonly position: Position;
+}
+
 export interface WorldData {
   readonly weather: Weather;
   readonly environmentObjects: readonly EnvironmentObject[];
-  readonly tileMap: readonly (readonly TileType[])[];
+  readonly tileMap: readonly (readonly TileType[])[]; // legacy, kept for stored state compat
+  readonly graveStones: readonly GraveStone[];
 }
 
-// --- Monitor Types ---
+// --- Monitor ---
 
 export interface MonitorState {
   readonly fileCount: number;
@@ -88,38 +114,62 @@ export interface MonitorState {
   readonly lastCommitTime: number;
 }
 
-// --- Message Types ---
+// --- Messages ---
 
 export type ExtToWebMessage =
-  | { readonly type: 'worldUpdate'; readonly creatures: readonly CreatureData[]; readonly world: WorldData; readonly bugs: number }
+  | { readonly type: 'worldUpdate'; readonly creatures: readonly CreatureData[]; readonly world: WorldData; readonly bugs: number; readonly agents: readonly AgentData[] }
   | { readonly type: 'creatureBorn'; readonly creature: CreatureData }
   | { readonly type: 'creatureDied'; readonly creatureId: string }
   | { readonly type: 'commitDetected' }
-  | { readonly type: 'bugCountChanged'; readonly count: number };
+  | { readonly type: 'bugCountChanged'; readonly count: number }
+  | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string };
 
 export type WebToExtMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'action'; readonly action: 'pet' | 'feed'; readonly targetId: string }
-  | { readonly type: 'nameCreature'; readonly creatureId: string; readonly name: string };
+  | { readonly type: 'heal'; readonly action: 'diet' | 'cure' | 'wake'; readonly targetId: string }
+  | { readonly type: 'nameCreature'; readonly creatureId: string; readonly name: string }
+  | { readonly type: 'moveCreature'; readonly creatureId: string; readonly position: Position }
+  | { readonly type: 'addAgent'; readonly agentType: AgentType }
+  | { readonly type: 'clickAgent'; readonly agentId: string }
+  | { readonly type: 'stopAgent'; readonly agentId: string }
+  | { readonly type: 'moveAgent'; readonly agentId: string; readonly position: Position }
+  | { readonly type: 'chatAgent'; readonly agentId: string; readonly message: string }
+  | { readonly type: 'moveAgentByKey'; readonly agentId: string; readonly dx: number; readonly dy: number }
+  | { readonly type: 'selectAgent'; readonly agentId: string }
+  | { readonly type: 'sitAgent'; readonly agentId: string; readonly sitting: boolean }
+  | { readonly type: 'deleteAgent'; readonly agentId: string }
+  | { readonly type: 'clearAllCreatures' };
 
-// --- Storage Types ---
+// --- Agent ---
+
+export type AgentType = 'claude' | 'cursor' | 'copilot' | 'custom';
+export type AgentStatus = 'idle' | 'running' | 'generating' | 'error' | 'done';
+
+export interface AgentData {
+  readonly id: string;
+  readonly name: string;
+  readonly agentType: AgentType;
+  readonly status: AgentStatus;
+  readonly position: Position;
+  readonly targetPosition: Position | null;
+  readonly terminalId: number | null;
+  readonly createdAt: number;
+  readonly spriteIndex: number;
+  readonly isPlayerControlled: boolean;
+  readonly isSitting: boolean;
+}
+
+// --- Storage ---
 
 export interface StoredState {
   readonly creatures: readonly CreatureData[];
   readonly world: WorldData;
   readonly monitorState: MonitorState;
+  readonly agents: readonly AgentData[];
 }
 
-// --- Sprite Types ---
+// --- Sprite ---
 
 export type SpriteData = readonly (readonly number[])[];
-
-export interface SpriteAnimation {
-  readonly frames: readonly SpriteData[];
-}
-
-export interface SpriteSheet {
-  readonly [key: string]: SpriteAnimation;
-}
-
 export type ColorPalette = readonly string[];

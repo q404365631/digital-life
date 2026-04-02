@@ -72,12 +72,20 @@ const webviewConfig = {
     new CopyPlugin({
       patterns: [
         {
-          from: 'src/ui/webview/index.html',
+          from: 'src/ui/webview/styles.css',
           to: path.resolve(__dirname, 'dist', 'webview'),
         },
         {
-          from: 'src/ui/webview/styles.css',
-          to: path.resolve(__dirname, 'dist', 'webview'),
+          from: 'assets/sprites/creature_*.png',
+          to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
+        },
+        {
+          from: 'assets/sprites/agent_*.png',
+          to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
+        },
+        {
+          from: 'assets/sprites/bg_room_*.png',
+          to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
         },
       ],
     }),

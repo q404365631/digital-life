@@ -1,7 +1,3 @@
-// ============================================================
-// Digital Life - Constants
-// ============================================================
-
 export const TILE_SIZE = 16;
 export const SPRITE_SIZE = 16;
 export const MAP_COLS = 30;
@@ -21,7 +17,7 @@ export const HATCH_DURATION = 10000; // 10 seconds to hatch
 export const GIT_POLL_INTERVAL = 5000; // 5 seconds
 export const FILE_DEBOUNCE = 300; // ms
 
-export const MAX_CREATURES = 10;
+export const MAX_CREATURES = 30;
 
 export const HUNGER_DECAY_RATE = 0.5;  // per minute
 export const HAPPINESS_DECAY_RATE = 0.3; // per minute

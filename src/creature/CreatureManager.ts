@@ -1,4 +1,4 @@
-import { CreatureData, Species } from '../types';
+import { CreatureData, Species, Position, CodingDNA, FileHealth } from '../types';
 import { MAX_CREATURES } from '../constants';
 import {
   createCreature,
@@ -10,12 +10,12 @@ import {
   petCreature,
   setCreatureMoodByBugs,
   addExp,
+  checkCreatureInteraction,
 } from './CreatureState';
 
 export class CreatureManager {
   private creatures: Map<string, CreatureData> = new Map();
   private fileToCreatureId: Map<string, string> = new Map();
-  private lastUpdateTime: number = Date.now();
 
   getAll(): readonly CreatureData[] {
     return Array.from(this.creatures.values());
@@ -38,7 +38,7 @@ export class CreatureManager {
     }
   }
 
-  spawnCreature(sourceFile: string, name: string, species: Species = 'dot'): CreatureData | null {
+  spawnCreature(sourceFile: string, name: string, species: Species = 'dot', dna?: CodingDNA): CreatureData | null {
     if (this.creatures.size >= MAX_CREATURES) {
       return null;
     }
@@ -47,10 +47,14 @@ export class CreatureManager {
       return null;
     }
 
-    const creature = createCreature(sourceFile, name, species);
+    const creature = createCreature(sourceFile, name, species, dna);
     this.creatures.set(creature.id, creature);
     this.fileToCreatureId.set(sourceFile, creature.id);
     return creature;
+  }
+
+  hasCreatureForFile(filePath: string): boolean {
+    return this.fileToCreatureId.has(filePath);
   }
 
   removeCreature(sourceFile: string): CreatureData | null {
@@ -86,6 +90,25 @@ export class CreatureManager {
     }
   }
 
+  updateFileHealth(sourceFile: string, health: FileHealth): void {
+    const creatureId = this.fileToCreatureId.get(sourceFile);
+    if (!creatureId) return;
+    const creature = this.creatures.get(creatureId);
+    if (!creature) return;
+    this.creatures.set(creatureId, { ...creature, fileHealth: health });
+  }
+
+  moveCreature(creatureId: string, position: Position): void {
+    const creature = this.creatures.get(creatureId);
+    if (creature) {
+      this.creatures.set(creatureId, {
+        ...creature,
+        position,
+        targetPosition: null,
+      });
+    }
+  }
+
   feedAll(): void {
     for (const [id, creature] of this.creatures) {
       this.creatures.set(id, feedCreature(creature));
@@ -105,7 +128,6 @@ export class CreatureManager {
   }
 
   tick(deltaMs: number): void {
-    const now = Date.now();
     const deltaMinutes = deltaMs / 60000;
 
     for (const [id, creature] of this.creatures) {
@@ -113,6 +135,7 @@ export class CreatureManager {
       updated = updateCreatureNeeds(updated, deltaMinutes);
       updated = updateReactionTimer(updated, deltaMs);
       updated = updateCreatureMovement(updated);
+      updated = checkCreatureInteraction(updated, this.getAll());
 
       // Advance animation frame
       updated = {
@@ -122,7 +145,5 @@ export class CreatureManager {
 
       this.creatures.set(id, updated);
     }
-
-    this.lastUpdateTime = now;
   }
 }

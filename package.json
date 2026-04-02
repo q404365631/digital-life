@@ -54,7 +54,8 @@
     },
     "commands": [
       { "command": "digitalLife.showPanel", "title": "Digital Life: Show Panel" },
-      { "command": "digitalLife.resetAll", "title": "Digital Life: Reset All (Start Over)" }
+      { "command": "digitalLife.resetAll", "title": "Digital Life: Reset All (Start Over)" },
+      { "command": "digitalLife.adoptFiles", "title": "Digital Life: Adopt Existing Files" }
     ]
   },
   "scripts": {

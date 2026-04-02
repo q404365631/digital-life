@@ -1,6 +1,7 @@
-import { Weather } from '../../../types';
+import { Weather, CodingDNA } from '../../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
+import { t } from '../i18n';
 
 export class UIRenderer {
   constructor(private readonly ctx: CanvasRenderingContext2D) {}
@@ -15,21 +16,7 @@ export class UIRenderer {
     this.ctx.fillStyle = '#FFFFFF';
     this.ctx.font = 'bold 12px monospace';
     this.ctx.textAlign = 'left';
-    this.ctx.fillText(`Lives: ${count}`, 16, 24);
-    this.ctx.restore();
-  }
-
-  renderGoalText(): void {
-    this.ctx.save();
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    this.ctx.beginPath();
-    this.ctx.roundRect(CANVAS_WIDTH / 2 - 80, CANVAS_HEIGHT - 28, 160, 20, 6);
-    this.ctx.fill();
-
-    this.ctx.fillStyle = '#FDD835';
-    this.ctx.font = 'bold 10px monospace';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText('GOAL: CARE FOR THEM', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 14);
+    this.ctx.fillText(`${t('lives')}: ${count}`, 16, 24);
     this.ctx.restore();
   }
 
@@ -84,7 +71,7 @@ export class UIRenderer {
     this.ctx.fillStyle = '#FFFFFF';
     this.ctx.font = 'bold 10px monospace';
     this.ctx.textAlign = 'right';
-    this.ctx.fillText(`Bugs: ${count}`, CANVAS_WIDTH - 16, 24);
+    this.ctx.fillText(`${t('bugs')}: ${count}`, CANVAS_WIDTH - 16, 24);
     this.ctx.restore();
   }
 
@@ -116,8 +103,68 @@ export class UIRenderer {
     this.ctx.lineWidth = 2;
     this.ctx.font = 'bold 16px monospace';
     this.ctx.textAlign = 'center';
-    this.ctx.strokeText('Committed!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-    this.ctx.fillText('Committed!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+    this.ctx.strokeText(t('committed'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+    this.ctx.fillText(t('committed'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+
+    this.ctx.restore();
+  }
+
+  renderDNAPanel(dna: CodingDNA): void {
+    const panelX = 8;
+    const panelY = CANVAS_HEIGHT - 100;
+    const panelW = 150;
+    const panelH = 90;
+    const barMaxW = 40;
+    const barH = 8;
+    const lineHeight = 14;
+
+    // Background
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(panelX, panelY, panelW, panelH, 8);
+    this.ctx.fill();
+
+    // Title
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.font = 'bold 10px sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(t('dna'), panelX + 6, panelY + 13);
+
+    const entries: { label: string; value: number; color: string }[] = [
+      { label: t('freq'), value: dna.commitFrequency, color: '#4CAF50' },
+      { label: t('night'), value: dna.nightOwl, color: '#7E57C2' },
+      { label: t('poly'), value: dna.polyglot, color: '#29B6F6' },
+      { label: t('speed'), value: dna.velocity, color: '#FFA726' },
+      { label: t('consist'), value: dna.consistency, color: '#EF5350' },
+    ];
+
+    const startY = panelY + 22;
+    const labelX = panelX + 6;
+    const barX = panelX + panelW - barMaxW - 8;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const y = startY + i * lineHeight;
+
+      // Label
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.font = '9px sans-serif';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText(entry.label, labelX, y + barH - 1);
+
+      // Bar background
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(barX, y, barMaxW, barH, 3);
+      this.ctx.fill();
+
+      // Bar fill
+      this.ctx.fillStyle = entry.color;
+      this.ctx.beginPath();
+      this.ctx.roundRect(barX, y, barMaxW * entry.value, barH, 3);
+      this.ctx.fill();
+    }
 
     this.ctx.restore();
   }

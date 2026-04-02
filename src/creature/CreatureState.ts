@@ -1,9 +1,10 @@
-import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType, Species } from '../types';
+import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType, Species, CodingDNA } from '../types';
+import { defaultDNA } from './DNAAnalyzer';
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, SPRITE_SIZE,
   HUNGER_DECAY_RATE, HAPPINESS_DECAY_RATE,
   FEED_AMOUNT, PET_AMOUNT, HATCH_DURATION,
-  CREATURE_SPEED, IDLE_DURATION_MIN, IDLE_DURATION_MAX,
+  CREATURE_SPEED,
 } from '../constants';
 
 function generateId(): string {
@@ -53,7 +54,7 @@ export function addExp(creature: CreatureData, amount: number): CreatureData {
   };
 }
 
-export function createCreature(sourceFile: string, name: string, species: Species = 'dot'): CreatureData {
+export function createCreature(sourceFile: string, name: string, species: Species = 'dot', dna?: CodingDNA): CreatureData {
   const pos = randomPosition();
   return {
     id: generateId(),
@@ -76,6 +77,8 @@ export function createCreature(sourceFile: string, name: string, species: Specie
     species,
     exp: 0,
     level: 1,
+    dna: dna ?? defaultDNA(),
+    fileHealth: { lineCount: 0, bugCount: 0, lastModified: Date.now() },
   };
 }
 
@@ -194,8 +197,18 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
     return creature;
   }
 
+  // DNA-based speed multiplier: 0.5x ~ 1.5x
+  const speedMultiplier = 0.5 + creature.dna.velocity;
+  const speed = CREATURE_SPEED * speedMultiplier;
+
   if (!creature.targetPosition) {
-    if (Math.random() < 0.01) {
+    // DNA consistency affects idle→walk transition probability
+    // High consistency = regular timing (base 0.01), low consistency = wider random range
+    const baseChance = 0.01;
+    const randomRange = (1 - creature.dna.consistency) * 0.02;
+    const moveChance = baseChance + (Math.random() - 0.5) * randomRange;
+
+    if (Math.random() < moveChance) {
       const target = randomTarget();
       const dx = target.x - creature.position.x;
       const dy = target.y - creature.position.y;
@@ -217,7 +230,7 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
   const dy = creature.targetPosition.y - creature.position.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
 
-  if (distance < CREATURE_SPEED * 2) {
+  if (distance < speed * 2) {
     return {
       ...creature,
       position: creature.targetPosition,
@@ -233,8 +246,8 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
   return {
     ...creature,
     position: {
-      x: creature.position.x + nx * CREATURE_SPEED,
-      y: creature.position.y + ny * CREATURE_SPEED,
+      x: creature.position.x + nx * speed,
+      y: creature.position.y + ny * speed,
     },
     animationState: getWalkDirection(dx, dy),
   };
@@ -271,4 +284,57 @@ function getWalkDirection(dx: number, dy: number): AnimationState {
     return dx > 0 ? 'walk_right' : 'walk_left';
   }
   return dy > 0 ? 'walk_down' : 'walk_up';
+}
+
+const INTERACTION_DISTANCE = 30;
+const SOCIAL_PROXIMITY = 12;
+
+/** Check for nearby creatures and apply social interaction (walk together + happiness bonus). */
+export function checkCreatureInteraction(
+  creature: CreatureData,
+  others: readonly CreatureData[]
+): CreatureData {
+  if (creature.stage === 'egg') {
+    return creature;
+  }
+
+  if (creature.reactionTimer > 0) {
+    return creature;
+  }
+
+  for (const other of others) {
+    if (other.id === creature.id) {
+      continue;
+    }
+    if (other.stage === 'egg') {
+      continue;
+    }
+    if (other.reactionTimer > 0) {
+      continue;
+    }
+
+    const dx = other.position.x - creature.position.x;
+    const dy = other.position.y - creature.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < INTERACTION_DISTANCE) {
+      const targetX = other.position.x + (dx > 0 ? -SOCIAL_PROXIMITY : SOCIAL_PROXIMITY);
+      const targetY = other.position.y + (dy > 0 ? -SOCIAL_PROXIMITY : SOCIAL_PROXIMITY);
+
+      const margin = SPRITE_SIZE * 2;
+      const clampedX = Math.max(margin, Math.min(CANVAS_WIDTH - margin, targetX));
+      const clampedY = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, targetY));
+
+      const newHappiness = Math.min(100, creature.happiness + 1);
+
+      return {
+        ...creature,
+        targetPosition: { x: clampedX, y: clampedY },
+        happiness: newHappiness,
+        mood: calculateMood(creature.hunger, newHappiness),
+      };
+    }
+  }
+
+  return creature;
 }

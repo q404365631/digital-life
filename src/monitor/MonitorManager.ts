@@ -1,7 +1,7 @@
 import { FileWatcher } from './FileWatcher';
 import { GitWatcher } from './GitWatcher';
 import { CodeAnalyzer } from './CodeAnalyzer';
-import { MonitorState } from '../types';
+import { MonitorState, FileHealth } from '../types';
 
 export interface MonitorCallbacks {
   readonly onFileCreated: (filePath: string) => void;
@@ -9,6 +9,7 @@ export interface MonitorCallbacks {
   readonly onFileDeleted: (filePath: string) => void;
   readonly onCommitDetected: (sha: string) => void;
   readonly onBugCountChanged: (count: number) => void;
+  readonly onFileHealthChanged: (filePath: string, health: FileHealth) => void;
 }
 
 export class MonitorManager {
@@ -63,6 +64,8 @@ export class MonitorManager {
       return;
     }
     this.updateBugCount(filePath);
+    const health = this.codeAnalyzer.analyzeFileDetailed(filePath);
+    this.callbacks.onFileHealthChanged(filePath, health);
     this.callbacks.onFileCreated(filePath);
   }
 
@@ -71,6 +74,8 @@ export class MonitorManager {
       return;
     }
     this.updateBugCount(filePath);
+    const health = this.codeAnalyzer.analyzeFileDetailed(filePath);
+    this.callbacks.onFileHealthChanged(filePath, health);
     this.callbacks.onFileChanged(filePath);
   }
 

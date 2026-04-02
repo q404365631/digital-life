@@ -1,96 +1,356 @@
-import { CreatureData, SpriteData, ColorPalette, EnvironmentObject } from '../../../types';
-import { SPRITE_SIZE } from '../../../constants';
-import { PUFF_PALETTE, PUFF_SPRITES, EGG_SPRITES, ADULT_SPRITES } from '../sprites/PuffSprites';
-import { ENV_PALETTE, TREE_SPRITE, ROCK_SPRITE, BUG_SPRITE, BUG_PALETTE } from '../sprites/EnvironmentSprites';
+import { CreatureData, AgentData, SpriteData, ColorPalette, GraveStone } from '../../../types';
+// Default palette for sprite cache key generation (formerly in PuffSprites.ts)
+const DEFAULT_PALETTE: ColorPalette = [
+  'transparent', '#1A1A1A', '#333333', '#0D0D0D', '#FFFFFF', '#000000', '#4A4A4A',
+];
 
-const SPECIES_PALETTES: Record<string, ColorPalette> = {
-  puff: ['transparent', '#FFB6C1', '#FFD1DC', '#E8909C', '#FFFFFF', '#000000', '#FFC0CB'],
-  blob: ['transparent', '#87CEEB', '#B0E0E6', '#5F9EA0', '#FFFFFF', '#000000', '#ADD8E6'],
-  pip: ['transparent', '#FFD700', '#FFEC8B', '#DAA520', '#FFFFFF', '#000000', '#FFA500'],
-  wisp: ['transparent', '#DDA0DD', '#E6E6FA', '#9370DB', '#FFFFFF', '#000000', '#D8BFD8'],
-  chomp: ['transparent', '#90EE90', '#98FB98', '#3CB371', '#FFFFFF', '#000000', '#7CFC00'],
-  dot: ['transparent', '#1A1A1A', '#333333', '#0D0D0D', '#FFFFFF', '#000000', '#4A4A4A'],
-};
+interface SpriteStore {
+  creatures: Record<string, string>;
+  agents: Record<string, string>;
+  backgrounds?: Record<string, string>;
+}
 
 export class SpriteRenderer {
   private spriteCanvasCache: Map<string, HTMLCanvasElement> = new Map();
+  private imageCache: Map<string, HTMLImageElement> = new Map();
+  private loadedImages: Map<string, boolean> = new Map();
 
-  constructor(private readonly ctx: CanvasRenderingContext2D) {}
+  constructor(private readonly ctx: CanvasRenderingContext2D) {
+    this.preloadSprites();
+  }
 
-  renderCreature(creature: CreatureData): void {
-    const spriteSheet = creature.stage === 'egg'
-      ? EGG_SPRITES
-      : creature.stage === 'adult'
-        ? ADULT_SPRITES
-        : PUFF_SPRITES;
-    const animation = spriteSheet[creature.animationState] ?? spriteSheet['idle'];
-    if (!animation) {
+  private preloadSprites(): void {
+    const sprites = (window as unknown as { __SPRITES__?: SpriteStore }).__SPRITES__;
+    if (!sprites) {
       return;
     }
 
-    const frameIndex = Math.floor(creature.animationFrame / 2) % animation.frames.length;
-    const frame = animation.frames[frameIndex];
+    for (const [species, url] of Object.entries(sprites.creatures)) {
+      this.loadImage(`creature_${species}`, url);
+    }
 
-    const flipX = creature.animationState === 'walk_left';
-    const palette = SPECIES_PALETTES[creature.species] ?? PUFF_PALETTE;
+    for (const [index, url] of Object.entries(sprites.agents)) {
+      this.loadImage(`agent_${index}`, url);
+    }
 
-    this.drawSprite(
-      frame,
-      palette,
-      creature.position.x - SPRITE_SIZE / 2,
-      creature.position.y - SPRITE_SIZE / 2,
-      SPRITE_SIZE,
-      flipX,
-      1.0
+    if (sprites.backgrounds) {
+      for (const [key, url] of Object.entries(sprites.backgrounds)) {
+        this.loadImage(`bg_${key}`, url);
+      }
+    }
+  }
+
+  getImage(key: string): HTMLImageElement | null {
+    const img = this.imageCache.get(key);
+    if (img && this.loadedImages.get(key)) {
+      return img;
+    }
+    return null;
+  }
+
+  private loadImage(key: string, url: string): void {
+    if (this.imageCache.has(key)) {
+      return;
+    }
+    const img = new Image();
+    img.onload = () => { this.loadedImages.set(key, true); };
+    img.src = url;
+    this.imageCache.set(key, img);
+  }
+
+  renderCreature(creature: CreatureData): void {
+    const key = `creature_${creature.species}`;
+    const img = this.imageCache.get(key);
+    if (!img || !this.loadedImages.get(key)) {
+      return;
+    }
+
+    const CREATURE_RENDER_SIZE = 26;
+    const renderSize = CREATURE_RENDER_SIZE;
+
+    const lineCount = creature.fileHealth?.lineCount ?? 0;
+    let scaleX = 1.0;
+    if (lineCount > 300) {
+      scaleX = 1.3;
+    } else if (lineCount > 100) {
+      scaleX = 1.15;
+    }
+
+    this.ctx.save();
+
+    if (scaleX !== 1.0) {
+      this.ctx.translate(creature.position.x, creature.position.y);
+      this.ctx.scale(scaleX, 1.0);
+      this.ctx.translate(-creature.position.x, -creature.position.y);
+    }
+
+    const bugCount = creature.fileHealth?.bugCount ?? 0;
+    if (bugCount > 0) {
+      this.ctx.filter = `saturate(${Math.max(0.3, 1 - bugCount * 0.15)}) brightness(${Math.max(0.7, 1 - bugCount * 0.08)})`;
+    }
+
+    this.ctx.drawImage(
+      img,
+      creature.position.x - renderSize / 2,
+      creature.position.y - renderSize / 2,
+      renderSize * scaleX,
+      renderSize
     );
 
-    // Draw name above creature
+    this.ctx.restore();
+
+    // Name label with background pill
     if (creature.stage !== 'egg') {
       this.ctx.save();
-      this.ctx.fillStyle = '#FFFFFF';
-      this.ctx.strokeStyle = '#000000';
-      this.ctx.lineWidth = 2;
-      this.ctx.font = '8px monospace';
+      this.ctx.font = 'bold 10px sans-serif';
       this.ctx.textAlign = 'center';
       const nameX = creature.position.x;
-      const nameY = creature.position.y - SPRITE_SIZE / 2 - 4;
-      this.ctx.strokeText(creature.name, nameX, nameY);
+      const nameY = creature.position.y - renderSize / 2 - 8;
+      const nameWidth = this.ctx.measureText(creature.name).width;
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(nameX - nameWidth / 2 - 4, nameY - 9, nameWidth + 8, 13, 4);
+      this.ctx.fill();
+      this.ctx.fillStyle = '#FFFFFF';
       this.ctx.fillText(creature.name, nameX, nameY);
       this.ctx.restore();
     }
 
-    // Draw reaction effects
+    // Reaction effects
     if (creature.reactionTimer > 0 && creature.reactionType) {
-      this.renderReactionEffect(creature);
+      this.renderReactionEffect(creature, renderSize);
+    }
+
+    // File health effects
+    this.renderHealthEffects(creature, renderSize);
+  }
+
+  private renderHealthEffects(creature: CreatureData, renderSize: number): void {
+    const fileBugCount = creature.fileHealth?.bugCount ?? 0;
+    const lineCount = creature.fileHealth?.lineCount ?? 0;
+
+    // Sweat mark (bug count >= 2)
+    if (fileBugCount >= 2) {
+      this.ctx.save();
+      this.ctx.font = '8px sans-serif';
+      this.ctx.fillStyle = '#64B5F6';
+      const sweatX = creature.position.x + renderSize / 2 + 2;
+      const sweatY = creature.position.y - renderSize / 2 + 4;
+      this.ctx.fillText('\u{1F4A7}', sweatX, sweatY);
+      this.ctx.restore();
+    }
+
+    // Sparkle (bug 0, line count <= 100 = healthy slim file)
+    if (fileBugCount === 0 && lineCount > 0 && lineCount <= 100) {
+      this.ctx.save();
+      const time = Date.now() / 300;
+      this.ctx.globalAlpha = 0.5 + Math.sin(time) * 0.3;
+      this.ctx.fillStyle = '#FFD700';
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 + time;
+        const radius = renderSize / 2 + 4;
+        const sx = creature.position.x + Math.cos(angle) * radius;
+        const sy = creature.position.y + Math.sin(angle) * radius;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+      this.ctx.restore();
+    }
+
+    // Abandoned detection
+    const lastMod = creature.fileHealth?.lastModified ?? Date.now();
+    const daysSinceModified = (Date.now() - lastMod) / (1000 * 60 * 60 * 24);
+
+    // 3+ days abandoned -> ZZZ
+    if (daysSinceModified > 3) {
+      this.ctx.save();
+      this.ctx.font = 'bold 8px sans-serif';
+      this.ctx.fillStyle = '#90A4AE';
+      const zzX = creature.position.x + renderSize / 2;
+      const zzY = creature.position.y - renderSize / 2 - 10;
+      const time = Date.now() / 500;
+      const floatY = Math.sin(time) * 2;
+      this.ctx.fillText('zzz', zzX, zzY + floatY);
+      this.ctx.restore();
+    }
+
+    // 7+ days abandoned -> grey filter (Husk premonition)
+    if (daysSinceModified > 7) {
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.3;
+      this.ctx.fillStyle = '#9E9E9E';
+      this.ctx.beginPath();
+      this.ctx.arc(creature.position.x, creature.position.y, renderSize / 2, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
     }
   }
 
-  renderEnvironmentObject(obj: EnvironmentObject): void {
-    let sprite: SpriteData;
-    let palette: ColorPalette;
-    let size: number;
+  renderGraveStone(grave: GraveStone): void {
+    const size = 16;
+    this.drawSprite(
+      GRAVE_SPRITE,
+      GRAVE_PALETTE,
+      grave.position.x - size / 2,
+      grave.position.y - size / 2,
+      size,
+      false,
+      1.0,
+    );
 
-    switch (obj.type) {
-      case 'tree':
-        sprite = TREE_SPRITE;
-        palette = ENV_PALETTE;
-        size = 32;
-        break;
-      case 'rock':
-        sprite = ROCK_SPRITE;
-        palette = ENV_PALETTE;
-        size = 16;
-        break;
-      case 'bug':
-        sprite = BUG_SPRITE;
-        palette = BUG_PALETTE;
-        size = 16;
-        break;
-      default:
-        return;
+    this.ctx.save();
+    this.ctx.fillStyle = '#AAAAAA';
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.font = '7px monospace';
+    this.ctx.textAlign = 'center';
+    const nameX = grave.position.x;
+    const nameY = grave.position.y - size / 2 - 3;
+    this.ctx.strokeText(grave.creatureName, nameX, nameY);
+    this.ctx.fillText(grave.creatureName, nameX, nameY);
+    this.ctx.restore();
+  }
+
+  renderAgent(agent: AgentData, isSelected: boolean = false): void {
+    const isMoving = agent.targetPosition !== null;
+
+    let imgKey: string;
+    if (agent.isSitting) {
+      const sitKey = `agent_${agent.spriteIndex}_sit`;
+      const sitImg = this.imageCache.get(sitKey);
+      if (sitImg && this.loadedImages.get(sitKey)) {
+        imgKey = sitKey;
+      } else {
+        imgKey = `agent_${agent.spriteIndex}`;
+      }
+    } else if (isMoving) {
+      const frameIdx = Math.floor(Date.now() / 200) % 4;
+      imgKey = `agent_${agent.spriteIndex}_f${frameIdx}`;
+    } else {
+      const idleFrame = Math.floor(Date.now() / 600) % 2;
+      imgKey = idleFrame === 0 ? `agent_${agent.spriteIndex}` : `agent_${agent.spriteIndex}_f1`;
     }
 
-    this.drawSprite(sprite, palette, obj.position.x, obj.position.y, size, false, obj.opacity);
+    const img = this.imageCache.get(imgKey);
+    if (!img || !this.loadedImages.get(imgKey)) {
+      // fallback to idle
+      const fallbackKey = `agent_${agent.spriteIndex}`;
+      const fallback = this.imageCache.get(fallbackKey);
+      if (!fallback || !this.loadedImages.get(fallbackKey)) {
+        return;
+      }
+      this.drawAgentImage(fallback, agent, isMoving, isSelected);
+      return;
+    }
+
+    this.drawAgentImage(img, agent, isMoving, isSelected);
+  }
+
+  private drawAgentImage(img: HTMLImageElement, agent: AgentData, isMoving: boolean, isSelected: boolean = false): void {
+    const AGENT_RENDER_SIZE = 64;
+    const renderSize = AGENT_RENDER_SIZE;
+
+    if (isSelected) {
+      this.ctx.save();
+      this.ctx.strokeStyle = '#FFD700';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(agent.position.x, agent.position.y + renderSize / 4, renderSize / 2 + 4, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+
+    const time = Date.now() / 250;
+    const bounce = agent.isSitting ? 0 : (isMoving ? Math.sin(time * 2) * 3 : Math.sin(time) * 1);
+
+    const isMovingLeft = agent.targetPosition !== null && agent.targetPosition.x < agent.position.x;
+
+    this.ctx.save();
+
+    if (isMovingLeft) {
+      this.ctx.translate(agent.position.x, agent.position.y);
+      this.ctx.scale(-1, 1);
+      this.ctx.translate(-agent.position.x, -agent.position.y);
+    }
+
+    this.ctx.drawImage(
+      img,
+      agent.position.x - renderSize / 2,
+      agent.position.y - renderSize / 2 + bounce,
+      renderSize,
+      renderSize
+    );
+    this.ctx.restore();
+
+    this.ctx.save();
+    this.ctx.font = 'bold 11px sans-serif';
+    this.ctx.textAlign = 'center';
+    const nameX = agent.position.x;
+    const nameY = agent.position.y - renderSize / 2 - 8 + bounce;
+    const nameWidth = this.ctx.measureText(agent.name).width;
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(nameX - nameWidth / 2 - 5, nameY - 10, nameWidth + 10, 14, 5);
+    this.ctx.fill();
+    this.ctx.fillStyle = '#FFD700';
+    this.ctx.fillText(agent.name, nameX, nameY);
+    this.ctx.restore();
+
+    this.renderAgentStatus(agent, renderSize);
+  }
+
+  private renderAgentStatus(agent: AgentData, renderSize: number): void {
+    const cx = agent.position.x;
+    const cy = agent.position.y;
+    const time = Date.now() / 200;
+
+    this.ctx.save();
+    switch (agent.status) {
+      case 'running':
+        if (Math.floor(time) % 2 === 0) {
+          this.ctx.font = '10px sans-serif';
+          this.ctx.fillText('\u{26A1}', cx + renderSize / 2, cy - renderSize / 2);
+        }
+        break;
+      case 'generating':
+        this.ctx.fillStyle = '#E040FB';
+        for (let i = 0; i < 4; i++) {
+          const angle = (i / 4) * Math.PI * 2 + time * 0.5;
+          const radius = renderSize / 2 + 6;
+          const sx = cx + Math.cos(angle) * radius;
+          const sy = cy + Math.sin(angle) * radius;
+          this.ctx.beginPath();
+          this.ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+        break;
+      case 'error':
+        this.ctx.font = '10px sans-serif';
+        this.ctx.fillText('\u{1F4A2}', cx + renderSize / 2, cy - renderSize / 2);
+        break;
+      case 'done':
+        this.ctx.globalAlpha = 0.5 + Math.sin(time) * 0.3;
+        this.ctx.fillStyle = '#FFD700';
+        for (let i = 0; i < 5; i++) {
+          const angle = (i / 5) * Math.PI * 2 + time * 0.3;
+          const radius = renderSize / 2 + 4;
+          this.ctx.beginPath();
+          this.ctx.arc(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 1.5, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+        break;
+      case 'idle':
+        this.ctx.fillStyle = '#90A4AE';
+        this.ctx.font = '8px sans-serif';
+        this.ctx.textAlign = 'center';
+        {
+          const dots = '.'.repeat((Math.floor(time / 3) % 3) + 1);
+          this.ctx.fillText(dots, cx, cy - renderSize / 2 - 2);
+        }
+        break;
+    }
+    this.ctx.restore();
   }
 
   private drawSprite(
@@ -100,7 +360,7 @@ export class SpriteRenderer {
     y: number,
     size: number,
     flipX: boolean,
-    opacity: number
+    opacity: number,
   ): void {
     const cacheKey = this.getSpriteKey(sprite, size, flipX, palette);
     let cached = this.spriteCanvasCache.get(cacheKey);
@@ -110,7 +370,9 @@ export class SpriteRenderer {
       cached.width = size;
       cached.height = size;
       const offCtx = cached.getContext('2d');
-      if (!offCtx) return;
+      if (!offCtx) {
+        return;
+      }
 
       const imageData = offCtx.createImageData(size, size);
       const data = imageData.data;
@@ -145,11 +407,11 @@ export class SpriteRenderer {
     if (opacity < 1) {
       this.ctx.globalAlpha = opacity;
     }
-    this.ctx.drawImage(cached, Math.floor(x), Math.floor(y));
+    this.ctx.drawImage(cached, Math.floor(x), Math.floor(y), size, size);
     this.ctx.restore();
   }
 
-  private renderReactionEffect(creature: CreatureData): void {
+  private renderReactionEffect(creature: CreatureData, renderSize: number): void {
     const cx = creature.position.x;
     const cy = creature.position.y;
     const progress = creature.reactionTimer / 1500; // 0..1
@@ -159,7 +421,6 @@ export class SpriteRenderer {
     this.ctx.globalAlpha = Math.min(1, progress * 2);
 
     if (creature.reactionType === 'feed') {
-      // Floating sparkles / stars around creature
       this.ctx.fillStyle = '#FFD700';
       for (let i = 0; i < 5; i++) {
         const angle = (i / 5) * Math.PI * 2 + time * 0.5;
@@ -167,24 +428,21 @@ export class SpriteRenderer {
         const rise = (1 - progress) * 16;
         const sx = cx + Math.cos(angle) * radius;
         const sy = cy - rise + Math.sin(angle) * radius * 0.5 - 4;
-        // Draw small star
         this.ctx.beginPath();
         this.ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
         this.ctx.fill();
       }
-      // Musical note emoji-style
       this.ctx.font = '8px monospace';
       this.ctx.textAlign = 'center';
-      const noteY = cy - SPRITE_SIZE / 2 - 8 - (1 - progress) * 10;
-      this.ctx.fillText('♪', cx + 8, noteY);
+      const noteY = cy - renderSize / 2 - 8 - (1 - progress) * 10;
+      this.ctx.fillText('\u266A', cx + 8, noteY);
     } else if (creature.reactionType === 'pet') {
-      // Floating hearts
       this.ctx.fillStyle = '#FF6B9D';
       for (let i = 0; i < 3; i++) {
         const rise = (1 - progress) * 20;
         const offsetX = (i - 1) * 8 + Math.sin(time + i * 3) * 2;
         const hx = cx + offsetX;
-        const hy = cy - SPRITE_SIZE / 2 - 6 - rise - i * 4;
+        const hy = cy - renderSize / 2 - 6 - rise - i * 4;
         this.drawHeart(hx, hy, 2.5);
       }
     }
@@ -202,17 +460,59 @@ export class SpriteRenderer {
     this.ctx.fill();
   }
 
-  private getSpriteKey(sprite: SpriteData, size: number, flipX: boolean, palette: ColorPalette = PUFF_PALETTE): string {
-    // Sample from multiple rows including center where sprites differ
+  renderInteractionHeart(
+    creatureA: CreatureData,
+    creatureB: CreatureData
+  ): void {
+    const visible = Math.floor(Date.now() / 500) % 2 === 0;
+    if (!visible) {
+      return;
+    }
+
+    const midX = (creatureA.position.x + creatureB.position.x) / 2;
+    const midY = (creatureA.position.y + creatureB.position.y) / 2;
+
+    this.ctx.save();
+    this.ctx.fillStyle = '#FF69B4';
+    this.ctx.globalAlpha = 0.8;
+    this.drawHeart(midX, midY - 8, 3);
+    this.ctx.restore();
+  }
+
+  private getSpriteKey(sprite: SpriteData, size: number, flipX: boolean, palette: ColorPalette = DEFAULT_PALETTE): string {
     const mid = Math.floor(size / 2);
     const q1 = Math.floor(size / 4);
     const q3 = Math.floor(size * 3 / 4);
-    const s = (r: number, c: number) => sprite[r]?.[c] ?? 0;
+    const s = (r: number, c: number): number => sprite[r]?.[c] ?? 0;
     const paletteKey = palette[1] ?? 'default';
-    const sample = `${s(q1,q1)}_${s(mid,mid)}_${s(q3,q3)}_${s(mid,q1)}_${s(q1,mid)}_${s(q3,mid)}_${size}_${flipX}_${paletteKey}`;
+    const sample = `${s(q1,q1)}_${s(mid,mid)}_${s(q3,q3)}_${s(mid,q1)}_${s(q1,mid)}_${s(q3,mid)}_${size}_${String(flipX)}_${paletteKey}`;
     return sample;
   }
 }
+
+// Gravestone sprite: 16x16
+const GRAVE_PALETTE: ColorPalette = [
+  'transparent', '#808080', '#A0A0A0', '#606060', '#505050',
+];
+
+const GRAVE_SPRITE: SpriteData = [
+  [0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0],
+  [0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
+  [0,0,0,0,1,1,2,2,2,2,1,1,0,0,0,0],
+  [0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],
+  [0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],
+  [0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],
+  [0,0,0,1,1,2,2,2,2,2,2,1,1,0,0,0],
+  [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0],
+  [0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0],
+  [0,0,4,4,4,4,4,4,4,4,4,4,4,4,0,0],
+  [0,0,0,4,4,4,4,4,4,4,4,4,4,0,0,0],
+];
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
