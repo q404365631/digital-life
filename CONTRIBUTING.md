@@ -5,7 +5,7 @@ Thank you for your interest in contributing!
 ## Development Setup
 
 ```bash
-git clone https://github.com/shikakeru/digital-life.git
+git clone https://github.com/teamshikakeru-glitch/digital-life.git
 cd digital-life
 npm install
 npm run watch  # Development mode

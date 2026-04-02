@@ -29,7 +29,7 @@ Your coding habits shape their world.
 ## Building from Source
 
 ```bash
-git clone https://github.com/shikakeru/digital-life.git
+git clone https://github.com/teamshikakeru-glitch/digital-life.git
 cd digital-life
 npm install
 npm run build
