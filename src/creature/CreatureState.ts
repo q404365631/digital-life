@@ -1,4 +1,4 @@
-import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType } from '../types';
+import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType, Species } from '../types';
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, SPRITE_SIZE,
   HUNGER_DECAY_RATE, HAPPINESS_DECAY_RATE,
@@ -26,7 +26,34 @@ function randomTarget(): Position {
   };
 }
 
-export function createCreature(sourceFile: string, name: string): CreatureData {
+const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
+
+export function calculateLevel(exp: number): number {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (exp >= LEVEL_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+export function calculateStage(level: number): CreatureStage {
+  if (level <= 2) return 'egg';
+  if (level <= 6) return 'baby';
+  return 'adult';
+}
+
+export function addExp(creature: CreatureData, amount: number): CreatureData {
+  const newExp = creature.exp + amount;
+  const newLevel = calculateLevel(newExp);
+  const newStage = calculateStage(newLevel);
+  return {
+    ...creature,
+    exp: newExp,
+    level: newLevel,
+    stage: newStage,
+  };
+}
+
+export function createCreature(sourceFile: string, name: string, species: Species = 'dot'): CreatureData {
   const pos = randomPosition();
   return {
     id: generateId(),
@@ -46,6 +73,9 @@ export function createCreature(sourceFile: string, name: string): CreatureData {
     lastPetted: Date.now(),
     reactionType: null,
     reactionTimer: 0,
+    species,
+    exp: 0,
+    level: 1,
   };
 }
 
@@ -97,8 +127,9 @@ export function feedCreature(creature: CreatureData): CreatureData {
   }
 
   const newHunger = Math.min(100, creature.hunger + FEED_AMOUNT);
+  const withExp = addExp(creature, 5);
   return {
-    ...creature,
+    ...withExp,
     hunger: newHunger,
     mood: calculateMood(newHunger, creature.happiness),
     animationState: 'eat' as AnimationState,
@@ -115,8 +146,9 @@ export function petCreature(creature: CreatureData): CreatureData {
   }
 
   const newHappiness = Math.min(100, creature.happiness + PET_AMOUNT);
+  const withExp = addExp(creature, 3);
   return {
-    ...creature,
+    ...withExp,
     happiness: newHappiness,
     mood: calculateMood(creature.hunger, newHappiness),
     animationState: 'happy' as AnimationState,

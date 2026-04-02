@@ -1,4 +1,4 @@
-import { CreatureData } from '../types';
+import { CreatureData, Species } from '../types';
 import { MAX_CREATURES } from '../constants';
 import {
   createCreature,
@@ -9,6 +9,7 @@ import {
   feedCreature,
   petCreature,
   setCreatureMoodByBugs,
+  addExp,
 } from './CreatureState';
 
 export class CreatureManager {
@@ -37,7 +38,7 @@ export class CreatureManager {
     }
   }
 
-  spawnCreature(sourceFile: string, name: string): CreatureData | null {
+  spawnCreature(sourceFile: string, name: string, species: Species = 'dot'): CreatureData | null {
     if (this.creatures.size >= MAX_CREATURES) {
       return null;
     }
@@ -46,7 +47,7 @@ export class CreatureManager {
       return null;
     }
 
-    const creature = createCreature(sourceFile, name);
+    const creature = createCreature(sourceFile, name, species);
     this.creatures.set(creature.id, creature);
     this.fileToCreatureId.set(sourceFile, creature.id);
     return creature;
@@ -88,6 +89,12 @@ export class CreatureManager {
   feedAll(): void {
     for (const [id, creature] of this.creatures) {
       this.creatures.set(id, feedCreature(creature));
+    }
+  }
+
+  commitBonus(): void {
+    for (const [id, creature] of this.creatures) {
+      this.creatures.set(id, addExp(creature, 10));
     }
   }
 

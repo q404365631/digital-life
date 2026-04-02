@@ -4,6 +4,7 @@ import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
 import { createInitialWorldState, updateWeather, setBugsInWorld } from './world/WorldState';
+import { getSpeciesForFile, SPECIES_DATA } from './creature/SpeciesData';
 import { WorldData, ExtToWebMessage } from './types';
 
 const TICK_INTERVAL = 200; // ms
@@ -41,8 +42,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const monitorManager = new MonitorManager(workspacePath, {
     onFileCreated: (filePath: string) => {
       const fileName = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? 'unknown';
-      void promptForName(fileName).then((name) => {
-        const creature = creatureManager.spawnCreature(filePath, name);
+      const species = getSpeciesForFile(filePath);
+      const speciesName = SPECIES_DATA[species].name;
+      void promptForName(fileName, speciesName).then((name) => {
+        const creature = creatureManager.spawnCreature(filePath, name, species);
         if (creature) {
           panelProvider.postMessage({ type: 'creatureBorn', creature });
           saveState();
@@ -61,6 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     onCommitDetected: (_sha: string) => {
       creatureManager.feedAll();
+      creatureManager.commitBonus();
       worldState = updateWeather(worldState, 0);
       panelProvider.postMessage({ type: 'commitDetected' });
       sendWorldUpdate();
@@ -152,9 +156,9 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   }
 
-  async function promptForName(fileName: string): Promise<string> {
+  async function promptForName(fileName: string, speciesName: string = 'creature'): Promise<string> {
     const name = await vscode.window.showInputBox({
-      prompt: `A new life is born from "${fileName}"! Give it a name:`,
+      prompt: `A ${speciesName} is born from "${fileName}"! Give it a name:`,
       placeHolder: 'Name your creature...',
       value: fileName.replace(/\.[^.]+$/, ''),
     });

@@ -4,7 +4,8 @@
 
 // --- Creature Types ---
 
-export type CreatureStage = 'egg' | 'baby';
+export type Species = 'puff' | 'blob' | 'pip' | 'wisp' | 'chomp' | 'dot';
+export type CreatureStage = 'egg' | 'baby' | 'adult';
 
 export type CreatureMood = 'happy' | 'neutral' | 'sad';
 
@@ -45,6 +46,9 @@ export interface CreatureData {
   readonly lastPetted: number;
   readonly reactionType: ReactionType;
   readonly reactionTimer: number; // ms remaining
+  readonly species: Species;
+  readonly exp: number;
+  readonly level: number;
 }
 
 // --- World Types ---

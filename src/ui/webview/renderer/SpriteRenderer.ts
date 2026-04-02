@@ -1,7 +1,16 @@
 import { CreatureData, SpriteData, ColorPalette, EnvironmentObject } from '../../../types';
 import { SPRITE_SIZE } from '../../../constants';
-import { PUFF_PALETTE, PUFF_SPRITES, EGG_SPRITES } from '../sprites/PuffSprites';
+import { PUFF_PALETTE, PUFF_SPRITES, EGG_SPRITES, ADULT_SPRITES } from '../sprites/PuffSprites';
 import { ENV_PALETTE, TREE_SPRITE, ROCK_SPRITE, BUG_SPRITE, BUG_PALETTE } from '../sprites/EnvironmentSprites';
+
+const SPECIES_PALETTES: Record<string, ColorPalette> = {
+  puff: ['transparent', '#FFB6C1', '#FFD1DC', '#E8909C', '#FFFFFF', '#000000', '#FFC0CB'],
+  blob: ['transparent', '#87CEEB', '#B0E0E6', '#5F9EA0', '#FFFFFF', '#000000', '#ADD8E6'],
+  pip: ['transparent', '#FFD700', '#FFEC8B', '#DAA520', '#FFFFFF', '#000000', '#FFA500'],
+  wisp: ['transparent', '#DDA0DD', '#E6E6FA', '#9370DB', '#FFFFFF', '#000000', '#D8BFD8'],
+  chomp: ['transparent', '#90EE90', '#98FB98', '#3CB371', '#FFFFFF', '#000000', '#7CFC00'],
+  dot: ['transparent', '#1A1A1A', '#333333', '#0D0D0D', '#FFFFFF', '#000000', '#4A4A4A'],
+};
 
 export class SpriteRenderer {
   private spriteCanvasCache: Map<string, HTMLCanvasElement> = new Map();
@@ -9,7 +18,11 @@ export class SpriteRenderer {
   constructor(private readonly ctx: CanvasRenderingContext2D) {}
 
   renderCreature(creature: CreatureData): void {
-    const spriteSheet = creature.stage === 'egg' ? EGG_SPRITES : PUFF_SPRITES;
+    const spriteSheet = creature.stage === 'egg'
+      ? EGG_SPRITES
+      : creature.stage === 'adult'
+        ? ADULT_SPRITES
+        : PUFF_SPRITES;
     const animation = spriteSheet[creature.animationState] ?? spriteSheet['idle'];
     if (!animation) {
       return;
@@ -19,10 +32,11 @@ export class SpriteRenderer {
     const frame = animation.frames[frameIndex];
 
     const flipX = creature.animationState === 'walk_left';
+    const palette = SPECIES_PALETTES[creature.species] ?? PUFF_PALETTE;
 
     this.drawSprite(
       frame,
-      PUFF_PALETTE,
+      palette,
       creature.position.x - SPRITE_SIZE / 2,
       creature.position.y - SPRITE_SIZE / 2,
       SPRITE_SIZE,
@@ -88,7 +102,7 @@ export class SpriteRenderer {
     flipX: boolean,
     opacity: number
   ): void {
-    const cacheKey = this.getSpriteKey(sprite, size, flipX);
+    const cacheKey = this.getSpriteKey(sprite, size, flipX, palette);
     let cached = this.spriteCanvasCache.get(cacheKey);
 
     if (!cached) {
@@ -188,13 +202,14 @@ export class SpriteRenderer {
     this.ctx.fill();
   }
 
-  private getSpriteKey(sprite: SpriteData, size: number, flipX: boolean): string {
+  private getSpriteKey(sprite: SpriteData, size: number, flipX: boolean, palette: ColorPalette = PUFF_PALETTE): string {
     // Sample from multiple rows including center where sprites differ
     const mid = Math.floor(size / 2);
     const q1 = Math.floor(size / 4);
     const q3 = Math.floor(size * 3 / 4);
     const s = (r: number, c: number) => sprite[r]?.[c] ?? 0;
-    const sample = `${s(q1,q1)}_${s(mid,mid)}_${s(q3,q3)}_${s(mid,q1)}_${s(q1,mid)}_${s(q3,mid)}_${size}_${flipX}`;
+    const paletteKey = palette[1] ?? 'default';
+    const sample = `${s(q1,q1)}_${s(mid,mid)}_${s(q3,q3)}_${s(mid,q1)}_${s(q1,mid)}_${s(q3,mid)}_${size}_${flipX}_${paletteKey}`;
     return sample;
   }
 }
