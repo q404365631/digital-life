@@ -1,0 +1,10 @@
+.github/
+src/
+.gitignore
+tsconfig.json
+tsconfig.webview.json
+webpack.config.js
+CONTRIBUTING.md
+**/*.ts
+**/*.map
+!dist/**

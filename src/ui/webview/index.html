@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Life</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="480" height="320"></canvas>
+    <div id="ui-overlay">
+      <div id="creature-count">0</div>
+      <div id="goal-text">GOAL: CARE FOR THEM</div>
+      <div id="action-panel">
+        <button id="btn-pet" class="action-btn" title="Pet">&#x1F90D;</button>
+        <div id="bread-source" class="action-btn" title="Feed - Drag to creature">&#x1F35E;</div>
+      </div>
+    </div>
+    <div id="bread-drag" class="bread-dragging">&#x1F35E;</div>
+    <div id="bread-effect" class="bread-effect">&#x1F35E;</div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
