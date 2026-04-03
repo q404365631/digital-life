@@ -479,7 +479,8 @@ export function activate(context: vscode.ExtensionContext): void {
   function handleAgentMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
       case 'addAgent': {
-        const rawType = String(message.agentType);
+        const rawType = String((message as any).agentType ?? '');
+        void vscode.window.showInformationMessage(`[addAgent] raw="${rawType}"`);
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
