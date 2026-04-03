@@ -8,10 +8,13 @@ function generateId(): string {
 }
 
 function randomTarget(): Position {
-  const margin = SPRITE_SIZE * 3;
+  const agentSize = 36;
+  const marginX = agentSize;
+  const marginTop = agentSize + 14; // sprite height + name label
+  const marginBottom = 20;
   return {
-    x: margin + Math.floor(Math.random() * (CANVAS_WIDTH - margin * 2)),
-    y: margin + Math.floor(Math.random() * (CANVAS_HEIGHT - margin * 2)),
+    x: marginX + Math.floor(Math.random() * (CANVAS_WIDTH - marginX * 2)),
+    y: marginTop + Math.floor(Math.random() * (CANVAS_HEIGHT - marginTop - marginBottom)),
   };
 }
 

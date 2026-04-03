@@ -306,7 +306,7 @@ export class SpriteRenderer {
   }
 
   renderAgent(agent: AgentData, isSelected: boolean = false): void {
-    const AGENT_RENDER_SIZE = 64;
+    const AGENT_RENDER_SIZE = 36;
     const renderSize = AGENT_RENDER_SIZE;
     const isMoving = agent.targetPosition !== null;
 
@@ -344,18 +344,22 @@ export class SpriteRenderer {
       col = idleFrame;
     }
 
+    // Bottom-center anchor: position.y = feet, sprite extends upward
+    const drawX = agent.position.x - renderSize / 2;
+    const drawY = agent.position.y - renderSize;
+
     if (isSelected) {
       this.ctx.save();
       this.ctx.strokeStyle = '#FFD700';
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
-      this.ctx.arc(agent.position.x, agent.position.y + renderSize / 4, renderSize / 2 + 4, 0, Math.PI * 2);
+      this.ctx.arc(agent.position.x, agent.position.y - renderSize / 2, renderSize / 2 + 4, 0, Math.PI * 2);
       this.ctx.stroke();
       this.ctx.restore();
     }
 
     const time = Date.now() / 250;
-    const bounce = agent.isSitting ? 0 : (isMoving ? Math.sin(time * 2) * 3 : Math.sin(time) * 1);
+    const bounce = agent.isSitting ? 0 : (isMoving ? Math.sin(time * 2) * 2 : Math.sin(time) * 0.5);
 
     const isMovingLeft = agent.targetPosition !== null && agent.targetPosition.x < agent.position.x;
 
@@ -371,22 +375,22 @@ export class SpriteRenderer {
       useSheet,
       col,
       row,
-      agent.position.x - renderSize / 2,
-      agent.position.y - renderSize / 2 + bounce,
+      drawX,
+      drawY + bounce,
       renderSize
     );
 
     this.ctx.restore();
 
     this.ctx.save();
-    this.ctx.font = 'bold 11px sans-serif';
+    this.ctx.font = 'bold 9px sans-serif';
     this.ctx.textAlign = 'center';
     const nameX = agent.position.x;
-    const nameY = agent.position.y - renderSize / 2 - 8 + bounce;
+    const nameY = drawY - 4 + bounce;
     const nameWidth = this.ctx.measureText(agent.name).width;
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     this.ctx.beginPath();
-    this.ctx.roundRect(nameX - nameWidth / 2 - 5, nameY - 10, nameWidth + 10, 14, 5);
+    this.ctx.roundRect(nameX - nameWidth / 2 - 4, nameY - 9, nameWidth + 8, 12, 4);
     this.ctx.fill();
     this.ctx.fillStyle = '#FFD700';
     this.ctx.fillText(agent.name, nameX, nameY);
@@ -397,7 +401,7 @@ export class SpriteRenderer {
 
   private renderAgentStatus(agent: AgentData, renderSize: number): void {
     const cx = agent.position.x;
-    const cy = agent.position.y;
+    const cy = agent.position.y - renderSize / 2; // visual center (bottom-center anchor)
     const time = Date.now() / 200;
 
     this.ctx.save();
