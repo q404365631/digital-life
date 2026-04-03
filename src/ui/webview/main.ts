@@ -542,6 +542,19 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 document.addEventListener('keydown', (event: KeyboardEvent) => {
   keysPressed.add(event.key);
 
+  // Number keys 1-9: switch to agent by index
+  if (event.key >= '1' && event.key <= '9') {
+    const idx = parseInt(event.key) - 1;
+    if (idx < agents.length) {
+      const agent = agents[idx];
+      selectedAgentId = agent.id;
+      renderer.setSelectedAgentId(agent.id);
+      soundEngine.playSelectAgent();
+      vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
+    }
+    return;
+  }
+
   // ESC key to cancel action mode or deselect agent
   if (event.key === 'Escape') {
     if (actionMode !== 'none') {
