@@ -91,7 +91,6 @@ function clampPan(): void {
 
 function updateCanvasCursor(): void {
   canvas.classList.toggle('panning', isPanning);
-  canvas.classList.toggle('zoomed', !isPanning && zoomLevel > 1.0);
 }
 
 // Wheel: trackpad pinch (ctrlKey) = zoom, trackpad 2-finger scroll = pan, mouse wheel = zoom
@@ -481,11 +480,11 @@ btnLang?.addEventListener('click', () => {
 function applyToolbarLabels(): void {
   const lang = getLanguage();
   if (btnLang)    { btnLang.textContent = langLabel(lang); btnLang.title = t('tt_lang'); }
-  if (btnFeed)    { btnFeed.title = t('tt_feed'); }
-  if (btnCare)    { btnCare.title = t('tt_care'); }
-  if (btnMute)    { btnMute.title = soundEngine.isMuted() ? t('tt_unmute') : t('tt_mute'); }
+  if (btnFeed)    { btnFeed.textContent = t('tt_feed'); btnFeed.title = t('tt_feed'); }
+  if (btnCare)    { btnCare.textContent = t('tt_care'); btnCare.title = t('tt_care'); }
+  if (btnMute)    { const m = soundEngine.isMuted(); btnMute.textContent = m ? t('tt_unmute') : t('tt_mute'); btnMute.title = m ? t('tt_unmute') : t('tt_mute'); }
   const addAgent = document.getElementById('btn-add-agent');
-  if (addAgent)   { addAgent.title = t('tt_add_agent'); }
+  if (addAgent)   { addAgent.textContent = '+ ' + t('tt_add_agent'); addAgent.title = t('tt_add_agent'); }
 }
 
 // ============================================================

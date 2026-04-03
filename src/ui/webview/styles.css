@@ -46,10 +46,6 @@ body {
   cursor: grabbing;
 }
 
-#game-canvas.zoomed {
-  cursor: grab;
-}
-
 #game-canvas.panning {
   cursor: grabbing;
 }

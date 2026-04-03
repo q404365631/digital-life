@@ -140,11 +140,11 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         <span id="status-text"></span>
       </div>
       <div id="toolbar-center">
-        <button id="btn-feed"      class="tool-btn" title="Feed"></button>
-        <button id="btn-care"      class="tool-btn" title="Care"></button>
-        <button id="btn-add-agent" class="tool-btn" title="Helper"></button>
+        <button id="btn-feed"      class="tool-btn" title="Feed">Feed</button>
+        <button id="btn-care"      class="tool-btn" title="Care">Care</button>
+        <button id="btn-add-agent" class="tool-btn" title="Helper">+ Helper</button>
         <button id="btn-lang"      class="tool-btn" title="Language">EN</button>
-        <button id="btn-mute"      class="tool-btn" title="Sound"></button>
+        <button id="btn-mute"      class="tool-btn" title="Sound">Sound</button>
       </div>
       <div id="toolbar-right">
         <span id="feed-mode-indicator" class="hidden"></span>
