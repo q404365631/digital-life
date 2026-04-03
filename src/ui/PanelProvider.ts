@@ -185,6 +185,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         <button id="btn-care"      class="tool-btn" title="Care">Care</button>
         <button id="btn-lineup"    class="tool-btn" title="Lineup">Lineup</button>
         <button id="btn-add-agent" class="tool-btn" title="Helper">+ Helper</button>
+        <button id="btn-switch-agent" class="tool-btn" title="Switch Agent">🔄</button>
         <button id="btn-lang"      class="tool-btn" title="Language">EN</button>
         <button id="btn-mute"      class="tool-btn" title="Sound">Sound</button>
       </div>

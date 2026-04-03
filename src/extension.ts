@@ -479,6 +479,16 @@ export function activate(context: vscode.ExtensionContext): void {
   function handleAgentMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
       case 'addAgent': {
+        const rawType = String(message.agentType);
+        // Handle terminal switching: 'switch:<agentId>'
+        if (rawType.startsWith('switch:')) {
+          const switchId = rawType.slice(7);
+          const switchTerminal = agentTerminals.get(switchId);
+          if (switchTerminal && !switchTerminal.exitStatus) {
+            switchTerminal.show(true);
+          }
+          return true;
+        }
         void (async () => {
           const pick = await vscode.window.showQuickPick([
             { label: '\u26A1 Claude Code', description: 'Anthropic Claude', value: 'claude' as AgentType },

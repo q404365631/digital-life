@@ -287,15 +287,12 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
       vscode.postMessage({ type: 'moveAgent', agentId, position: override });
     } else if (!dragMoved) {
       // Tap (no drag): select agent + switch terminal
-      console.log(`[DL-WV] pointerup TAP: sending clickAgent for ${agentId}`);
       selectedAgentId = agentId;
       renderer.setSelectedAgentId(agentId);
       soundEngine.playSelectAgent();
-      vscode.postMessage({ type: 'selectAgent', agentId });
-      vscode.postMessage({ type: 'clickAgent', agentId });
-      tapHandledByPointerUp = true; // suppress duplicate click event
-    } else {
-      console.log(`[DL-WV] pointerup DRAG: dragMoved=${dragMoved}`);
+      // Use addAgent with switch: prefix — the ONLY reliable message path
+      vscode.postMessage({ type: 'addAgent', agentType: `switch:${agentId}` as any });
+      tapHandledByPointerUp = true;
     }
     dragOverridePositions.delete(agentId);
     draggingAgentId = null;
@@ -525,8 +522,7 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     selectedAgentId = agentHit;
     renderer.setSelectedAgentId(agentHit);
     soundEngine.playSelectAgent();
-    vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
-    vscode.postMessage({ type: 'clickAgent', agentId: agentHit });
+    vscode.postMessage({ type: 'addAgent', agentType: `switch:${agentHit}` as any });
     return;
   }
 
@@ -605,6 +601,21 @@ btnAddAgent?.addEventListener('click', () => {
   const types: AgentType[] = ['claude', 'cursor', 'copilot'];
   const nextType = types[agents.length % types.length];
   vscode.postMessage({ type: 'addAgent', agentType: nextType });
+});
+
+// Switch agent button — cycles through agents and switches terminal
+const btnSwitchAgent = document.getElementById('btn-switch-agent');
+btnSwitchAgent?.addEventListener('click', () => {
+  if (agents.length === 0) return;
+  // Find next agent after currently selected
+  const currentIdx = agents.findIndex(a => a.id === selectedAgentId);
+  const nextIdx = (currentIdx + 1) % agents.length;
+  const agent = agents[nextIdx];
+  selectedAgentId = agent.id;
+  renderer.setSelectedAgentId(agent.id);
+  soundEngine.playSelectAgent();
+  // Use addAgent type with special 'switch:' prefix (addAgent is the only reliable message type)
+  vscode.postMessage({ type: 'addAgent', agentType: `switch:${agent.id}` as any });
 });
 
 // Delete agent: long-press on selected agent (or via command palette)
