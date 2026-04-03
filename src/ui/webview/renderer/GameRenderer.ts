@@ -103,7 +103,7 @@ export class GameRenderer {
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Fill background color as fallback
-    this.ctx.fillStyle = '#1A1A2E';
+    this.ctx.fillStyle = '#F5F0E8';
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // === World layer (affected by zoom & pan) ===
@@ -112,7 +112,7 @@ export class GameRenderer {
     this.ctx.scale(zoom, zoom);
 
     // Solid background color (no background image)
-    this.ctx.fillStyle = '#1A1A2E';
+    this.ctx.fillStyle = '#F5F0E8';
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Draw gravestones
