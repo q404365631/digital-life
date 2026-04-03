@@ -149,4 +149,21 @@ export class SoundEngine {
   playAgentSpawn(): void     { this.play('agentSpawn', 0.5); }
   playSelectCreature(): void { this.play('selectCreature', 0.35); }
   playSelectAgent(): void    { this.play('selectAgent', 0.4); }
+
+  /** Speak text using Web Speech API (TTS). Falls back silently if unavailable. */
+  speak(text: string): void {
+    if (this.muted) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    // Cancel any ongoing speech
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Detect language: if text contains CJK characters, use Japanese
+    const hasCJK = /[\u3000-\u9FFF\uF900-\uFAFF]/.test(text);
+    utterance.lang = hasCJK ? 'ja-JP' : 'en-US';
+    utterance.rate = 1.1;
+    utterance.pitch = 1.3; // slightly high-pitched for cute creature voice
+    utterance.volume = 0.7;
+    synth.speak(utterance);
+  }
 }

@@ -18,6 +18,9 @@ export type SpeechEvent =
   | 'heal'
   | 'levelUp'
   | 'morning'
+  | 'afternoon'
+  | 'evening'
+  | 'lateNight'
   | 'friendship'
   | 'suggest';
 
@@ -87,6 +90,36 @@ const T: EventPool = {
     shy:     { en: ['...morning.', 'Oh, you\'re back.', '...hi.'],
                ja: ['...おはよう', 'あ、かえってきた', '...おはよ'] },
   },
+  afternoon: {
+    active:  { en: ['Keep going!', 'Afternoon push!', 'Half day done!'],
+               ja: ['まだまだいける！', 'ごごもがんばろ！', 'はんぶんきた！'] },
+    calm:    { en: ['Afternoon already.', 'Time flies.', 'Take a break?'],
+               ja: ['もうごごだね', 'はやいなぁ', 'きゅうけいする？'] },
+    curious: { en: ['Lunch break?', 'What\'s for lunch?', 'Afternoon plans?'],
+               ja: ['おひるたべた？', 'ごはんなに？', 'ごごのよていは？'] },
+    shy:     { en: ['...still here.', '...afternoon.', '...hungry?'],
+               ja: ['...まだいるよ', '...ごご', '...おなかすいた？'] },
+  },
+  evening: {
+    active:  { en: ['Great work today!', 'Almost done!', 'Final push!'],
+               ja: ['きょうもおつかれ！', 'もうすこし！', 'ラストスパート！'] },
+    calm:    { en: ['Evening.', 'Good work today.', 'Time to rest soon.'],
+               ja: ['おつかれさま', 'きょうもがんばった', 'もうすぐやすめるよ'] },
+    curious: { en: ['Did you finish?', 'What\'d you learn today?', 'Evening already!'],
+               ja: ['おわった？', 'きょうなにまなんだ？', 'もうよるだ！'] },
+    shy:     { en: ['...good night soon.', '...tired?', '...rest well.'],
+               ja: ['...もうよるだね', '...つかれた？', '...おやすみ'] },
+  },
+  lateNight: {
+    active:  { en: ['Still going?!', 'Night owl!', 'Don\'t burn out!'],
+               ja: ['まだやる！？', 'よふかしだ！', 'むりしないで！'] },
+    calm:    { en: ['It\'s late...', 'Sleep is important.', 'Tomorrow is another day.'],
+               ja: ['おそいよ...', 'すいみんだいじ', 'あしたもあるよ'] },
+    curious: { en: ['What keeps you up?', 'The night is quiet...', 'Night coding?'],
+               ja: ['なにしてるの？', 'よるはしずか...', 'よるのコーディング？'] },
+    shy:     { en: ['...please sleep.', '...zzz...', '...too late...'],
+               ja: ['...ねてほしい', '...zzz...', '...おそいよ...'] },
+  },
   friendship: {
     active:  { en: ['Buddy!', 'Hey friend!', 'Let\'s play!'],
                ja: ['なかま！', 'ともだち！', 'あそぼう！'] },
@@ -98,14 +131,14 @@ const T: EventPool = {
                ja: ['...おとなり', '...うれしい', '...ひとりじゃない'] },
   },
   suggest: {
-    active:  { en: ['Fix me!', 'I can be better!', 'Help me out!'],
-               ja: ['なおして！', 'もっとよくなれる！', 'たすけて！'] },
-    calm:    { en: ['Something\'s off...', 'Could use some care.', 'When you have time...'],
-               ja: ['なにかおかしい...', 'お世話してほしい', 'じかんあるとき...'] },
-    curious: { en: ['What\'s this bug?', 'Something\'s weird...', 'Can you check me?'],
-               ja: ['このバグなに？', 'へんなかんじ...', 'みてくれる？'] },
-    shy:     { en: ['...it hurts a bit.', '...help?', '...please.'],
-               ja: ['...ちょっといたい', '...たすけて？', '...おねがい'] },
+    active:  { en: ['I\'m not feeling great... fix me!', 'Something\'s wrong, help!', 'I need medicine!'],
+               ja: ['ちょっと体調わるいかも...なおして！', 'どこかおかしい、たすけて！', 'おくすりほしい！'] },
+    calm:    { en: ['I feel a bit under the weather...', 'Could use some care when you have time.', 'Something\'s bothering me...'],
+               ja: ['すこし体調がすぐれない...', 'じかんあるときお世話してほしいな', 'なにかきになる...'] },
+    curious: { en: ['Hmm, what\'s this feeling? Am I sick?', 'Something\'s different about me...', 'Can you check on me?'],
+               ja: ['あれ、このきもちなに？びょうき？', 'いつもとちがうかんじ...', 'ちょっとみてくれる？'] },
+    shy:     { en: ['...I don\'t feel so good.', '...could you help me?', '...please take care of me.'],
+               ja: ['...ちょっとぐあいわるい', '...たすけてくれる？', '...おせわしてほしいな'] },
   },
 };
 

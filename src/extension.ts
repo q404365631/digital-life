@@ -44,6 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Direct terminal references — the ONLY source of truth for agent→terminal mapping
   const agentTerminals: Map<string, vscode.Terminal> = new Map();
+  const outputChannel = vscode.window.createOutputChannel('Digital Life');
   let worldState: WorldData;
 
   // Restore state
@@ -143,6 +144,28 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  /** Return the appropriate speech event for the current time of day */
+  function getTimeOfDaySpeechEvent(): SpeechEvent {
+    const hour = new Date().getHours();
+    if (hour >= 22 || hour < 5) return 'lateNight';
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+  }
+
+  /** Periodically broadcast time-of-day speech (every 30 minutes) */
+  let lastTimeSlot = '';
+  function startTimeOfDayTimer(): void {
+    setInterval(() => {
+      const event = getTimeOfDaySpeechEvent();
+      if (event !== lastTimeSlot) {
+        lastTimeSlot = event;
+        broadcastSpeech(event);
+      }
+    }, 30 * 60 * 1000); // check every 30 minutes
+    lastTimeSlot = getTimeOfDaySpeechEvent();
+  }
+
   // ── Feature D: Friendship graph from import dependencies ────
   let friendshipPairs: { a: string; b: string }[] = [];
   let lastFriendshipScan = 0;
@@ -205,13 +228,19 @@ export function activate(context: vscode.ExtensionContext): void {
     let description: string;
     if (h.bugCount >= 3) {
       action = 'cure';
-      description = `${h.bugCount} bugs found`;
+      description = speechLang === 'ja'
+        ? `バグが${h.bugCount}個...お薬をあげますか？`
+        : `${h.bugCount} bugs making them sick... give medicine?`;
     } else if (h.lineCount > 400) {
       action = 'diet';
-      description = `${h.lineCount} lines — too heavy`;
+      description = speechLang === 'ja'
+        ? `${h.lineCount}行もあって重そう...ダイエットさせますか？`
+        : `${h.lineCount} lines — feeling heavy... put on a diet?`;
     } else {
       action = 'wake';
-      description = 'hasn\'t been touched in a while';
+      description = speechLang === 'ja'
+        ? 'しばらく触ってもらえてなくて寂しそう...起こしますか？'
+        : 'hasn\'t been touched in a while... feeling lonely. Wake them up?';
     }
 
     panelProvider.postMessage({
@@ -230,7 +259,7 @@ export function activate(context: vscode.ExtensionContext): void {
     lastSuggestionTime = now;
   }
 
-  // ── Feature C: Morning diary ────────────────────────────────
+  // ── Feature C: Morning Briefing ──────────────────────────────
   let morningSent = false;
 
   function sendMorningDiary(): void {
@@ -240,34 +269,66 @@ export function activate(context: vscode.ExtensionContext): void {
     const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
     if (all.length === 0) return;
 
-    // Pick the first creature and generate a diary-like summary
-    const creature = all[0];
-    const h = creature.fileHealth;
-    const daysSince = Math.floor((Date.now() - h.lastModified) / 864e5);
+    // Collect health stats across all creatures
+    const sickCreatures: { name: string; bugs: number }[] = [];
+    const tiredCreatures: { name: string; days: number }[] = [];
+    const heavyCreatures: { name: string; lines: number }[] = [];
+    let totalBugs = 0;
 
+    for (const c of all) {
+      const h = c.fileHealth;
+      const daysSince = Math.floor((Date.now() - h.lastModified) / 864e5);
+      totalBugs += h.bugCount;
+      if (h.bugCount > 0) { sickCreatures.push({ name: c.name, bugs: h.bugCount }); }
+      if (daysSince > 3) { tiredCreatures.push({ name: c.name, days: daysSince }); }
+      if (h.lineCount > 300) { heavyCreatures.push({ name: c.name, lines: h.lineCount }); }
+    }
+
+    const unhealthyCount = sickCreatures.length + tiredCreatures.length + heavyCreatures.length;
+
+    // Build briefing message
     let entry: string;
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? (speechLang === 'ja' ? 'おはようございます' : 'Good morning')
+                   : hour < 18 ? (speechLang === 'ja' ? 'こんにちは' : 'Good afternoon')
+                   : (speechLang === 'ja' ? 'こんばんは' : 'Good evening');
+
     if (speechLang === 'ja') {
-      if (h.bugCount > 0) {
-        entry = `きのうから${h.bugCount}このバグがある...がんばらなきゃ`;
-      } else if (daysSince > 3) {
-        entry = `${daysSince}にちもさわってもらえてない...さみしいな`;
-      } else if (h.lineCount > 300) {
-        entry = `${h.lineCount}ぎょう...ちょっとおもたいかも`;
+      if (unhealthyCount === 0) {
+        entry = `${greeting}！みんな元気です！${all.length}体の子たちが待ってましたよ`;
       } else {
-        entry = 'きょうもいちにちがんばろう！';
+        const parts: string[] = [];
+        if (sickCreatures.length > 0) {
+          parts.push(`${sickCreatures.length}体がバグで体調悪いみたい`);
+        }
+        if (tiredCreatures.length > 0) {
+          parts.push(`${tiredCreatures.length}体がしばらく触ってもらえてない`);
+        }
+        if (heavyCreatures.length > 0) {
+          parts.push(`${heavyCreatures.length}体がちょっと重そう`);
+        }
+        entry = `${greeting}！${parts.join('、')}。見てあげますか？`;
       }
     } else {
-      if (h.bugCount > 0) {
-        entry = `Still have ${h.bugCount} bugs since yesterday... gotta push through`;
-      } else if (daysSince > 3) {
-        entry = `No one touched me for ${daysSince} days... lonely`;
-      } else if (h.lineCount > 300) {
-        entry = `${h.lineCount} lines... feeling a bit heavy`;
+      if (unhealthyCount === 0) {
+        entry = `${greeting}! Everyone is healthy! ${all.length} friends are waiting for you`;
       } else {
-        entry = 'Ready for a new day!';
+        const parts: string[] = [];
+        if (sickCreatures.length > 0) {
+          parts.push(`${sickCreatures.length} feeling sick (bugs)`);
+        }
+        if (tiredCreatures.length > 0) {
+          parts.push(`${tiredCreatures.length} feeling lonely (untouched)`);
+        }
+        if (heavyCreatures.length > 0) {
+          parts.push(`${heavyCreatures.length} feeling heavy (large files)`);
+        }
+        entry = `${greeting}! ${parts.join(', ')}. Want to check on them?`;
       }
     }
 
+    // Send as diary to the first creature (it speaks on behalf of all)
+    const creature = all[0];
     panelProvider.postMessage({ type: 'diary', creatureId: creature.id, entry });
   }
 
@@ -480,23 +541,22 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
+        outputChannel.appendLine(`[addAgent] rawType="${rawType}" keys=${Object.keys(message).join(',')}`);
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
+          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'}`);
           if (switchTerminal && !switchTerminal.exitStatus) {
-            // Use VS Code terminal navigation commands instead of terminal.show()
-            void (async () => {
-              // 1. Focus the terminal panel
-              await vscode.commands.executeCommand('workbench.action.terminal.focus');
-              // 2. Cycle through terminals until we find the right one
-              let attempts = vscode.window.terminals.length;
-              while (attempts-- > 0) {
-                if (vscode.window.activeTerminal === switchTerminal) { break; }
-                await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
-              }
-            })();
+            // Try terminal.show() first, then fallback to navigation commands
+            switchTerminal.show(false);
+            outputChannel.appendLine(`[switch] terminal.show() called for "${switchTerminal.name}"`);
+          } else {
+            outputChannel.appendLine(`[switch] terminal not found or exited`);
           }
+          // Also select the agent in the manager
+          agentManager.selectAgent(switchId);
+          sendWorldUpdate();
           return true;
         }
         void (async () => {
@@ -555,13 +615,8 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       case 'selectAgent': {
         agentManager.selectAgent(message.agentId);
-        const selAgent = agentManager.getById(message.agentId);
-        const selTerminal = selAgent ? agentTerminals.get(selAgent.id) : undefined;
-        const termCount = agentTerminals.size;
-        const allTermNames = [...agentTerminals.entries()].map(([id, t]) => `${id.slice(-4)}→${t.name}`).join(', ');
-        void vscode.window.showInformationMessage(
-          `[selectAgent] agent=${selAgent?.name ?? 'NONE'} terminal=${selTerminal?.name ?? 'NONE'} map(${termCount}): ${allTermNames}`
-        );
+        const selTerminal = agentTerminals.get(message.agentId);
+        outputChannel.appendLine(`[selectAgent] id="${message.agentId}" terminal=${selTerminal?.name ?? 'NONE'}`);
         if (selTerminal && !selTerminal.exitStatus) {
           selTerminal.show(false);
         }
@@ -637,9 +692,10 @@ export function activate(context: vscode.ExtensionContext): void {
         sendWorldUpdate();
         if (!isFirstRun) {
           setTimeout(() => sendMorningDiary(), 2000);
-          broadcastSpeech('morning');
+          broadcastSpeech(getTimeOfDaySpeechEvent());
         }
         setTimeout(() => updateFriendships(), 3000);
+        startTimeOfDayTimer();
         return true;
       case 'lineup':
         performLineup();

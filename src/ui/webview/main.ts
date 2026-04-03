@@ -411,6 +411,7 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       // Feature A: Living words — event-driven speech override
       eventSpeechOverrides.set(message.creatureId, { text: message.text, timestamp: Date.now() });
       soundEngine.playSpeech();
+      soundEngine.speak(message.text);
       break;
     }
 
@@ -435,9 +436,10 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
     }
 
     case 'diary': {
-      // Feature C: Morning diary — show as speech on the creature
+      // Feature C: Morning Briefing — show as speech on the creature + TTS
       eventSpeechOverrides.set(message.creatureId, { text: message.entry, timestamp: Date.now() });
       soundEngine.playMorning();
+      soundEngine.speak(message.entry);
       break;
     }
 
@@ -537,29 +539,6 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 // Keyboard controls
 document.addEventListener('keydown', (event: KeyboardEvent) => {
   keysPressed.add(event.key);
-
-  // DEBUG: Press 0 to add agent (tests if postMessage works from keyboard)
-  if (event.key === '0') {
-    vscode.postMessage({ type: 'addAgent', agentType: 'claude' });
-    return;
-  }
-  // DEBUG: all unconditional — testing if message type matters
-  if (event.key === '1') {
-    vscode.postMessage({ type: 'addAgent', agentType: 'claude' });
-    return;
-  }
-  if (event.key === '2') {
-    vscode.postMessage({ type: 'addAgent', agentType: 'cursor' });
-    return;
-  }
-  if (event.key === '3') {
-    vscode.postMessage({ type: 'selectAgent', agentId: 'test123' } as any);
-    return;
-  }
-  if (event.key === '4') {
-    vscode.postMessage({ type: 'lineup' });
-    return;
-  }
 
   // ESC key to cancel action mode or deselect agent
   if (event.key === 'Escape') {
