@@ -151,30 +151,30 @@ canvas.addEventListener('dblclick', () => {
 // Left-click drag on canvas: creature drag or pan
 canvas.addEventListener('pointerdown', (event: PointerEvent) => {
   if (event.button === 0 && actionMode === 'none') {
-    // Check if clicking on a creature (for drag)
     const worldPos = screenToWorld(event.clientX, event.clientY);
-    const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
 
-    if (targetId) {
-      // Start dragging creature
-      draggingCreatureId = targetId;
+    // Find nearest creature AND agent — pick whichever is closest
+    const { id: creatureHit, dist: creatureDist } = findCreatureAtCanvasPosWithDist(worldPos.x, worldPos.y);
+    const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);
+
+    // Agent wins tie (larger sprite, harder to miss)
+    if (agentHit && agentDist <= creatureDist) {
+      draggingAgentId = agentHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       dragMoved = false;
-      dragOverridePositions.set(targetId, { x: worldPos.x, y: worldPos.y });
+      dragOverridePositions.set(agentHit, { x: worldPos.x, y: worldPos.y });
       canvas.classList.add('dragging-creature');
       canvas.setPointerCapture(event.pointerId);
       return;
     }
 
-    // Check if clicking on an agent (for drag)
-    const agentId = findAgentAtCanvasPos(worldPos.x, worldPos.y);
-    if (agentId) {
-      draggingAgentId = agentId;
+    if (creatureHit) {
+      draggingCreatureId = creatureHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       dragMoved = false;
-      dragOverridePositions.set(agentId, { x: worldPos.x, y: worldPos.y });
+      dragOverridePositions.set(creatureHit, { x: worldPos.x, y: worldPos.y });
       canvas.classList.add('dragging-creature');
       canvas.setPointerCapture(event.pointerId);
       return;
@@ -491,10 +491,9 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 
   const worldPos = screenToWorld(event.clientX, event.clientY);
 
-  // Find closest creature to click (in world coordinates)
-  const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
-
+  // Action mode: only targets creatures
   if (actionMode !== 'none') {
+    const targetId = findCreatureAtCanvasPos(worldPos.x, worldPos.y);
     if (targetId) {
       const creature = creatures.find(c => c.id === targetId);
       if (creature) {
@@ -505,26 +504,25 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     return;
   }
 
-  if (targetId) {
-    selectedCreatureId = targetId;
-    soundEngine.playSelectCreature();
-    // Reveal this creature's file in the editor
-    vscode.postMessage({ type: 'revealFile', creatureId: targetId });
+  // Find nearest creature AND agent — pick whichever is closest
+  const { id: creatureHit, dist: creatureDist } = findCreatureAtCanvasPosWithDist(worldPos.x, worldPos.y);
+  const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);
+
+  // Agent wins tie
+  if (agentHit && agentDist <= creatureDist) {
+    selectedAgentId = agentHit;
+    renderer.setSelectedAgentId(agentHit);
+    soundEngine.playSelectAgent();
+    vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
+    vscode.postMessage({ type: 'clickAgent', agentId: agentHit });
     return;
   }
 
-  // Check agents (click = select + open terminal)
-  for (const agent of agents) {
-    const dx = agent.position.x - worldPos.x;
-    const dy = agent.position.y - worldPos.y;
-    if (Math.sqrt(dx * dx + dy * dy) < 32) {
-      selectedAgentId = agent.id;
-      renderer.setSelectedAgentId(agent.id);
-      soundEngine.playSelectAgent();
-      vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
-      vscode.postMessage({ type: 'clickAgent', agentId: agent.id });
-      return;
-    }
+  if (creatureHit) {
+    selectedCreatureId = creatureHit;
+    soundEngine.playSelectCreature();
+    vscode.postMessage({ type: 'revealFile', creatureId: creatureHit });
+    return;
   }
 });
 
@@ -601,6 +599,10 @@ function applyToolbarLabels(): void {
 // ============================================================
 
 function findCreatureAtCanvasPos(worldX: number, worldY: number): string | null {
+  return findCreatureAtCanvasPosWithDist(worldX, worldY).id;
+}
+
+function findCreatureAtCanvasPosWithDist(worldX: number, worldY: number): { id: string | null; dist: number } {
   let closestId: string | null = null;
   let closestDist = 32;
 
@@ -614,12 +616,16 @@ function findCreatureAtCanvasPos(worldX: number, worldY: number): string | null 
     }
   }
 
-  return closestId;
+  return { id: closestId, dist: closestDist };
 }
 
 function findAgentAtCanvasPos(worldX: number, worldY: number): string | null {
+  return findAgentAtCanvasPosWithDist(worldX, worldY).id;
+}
+
+function findAgentAtCanvasPosWithDist(worldX: number, worldY: number): { id: string | null; dist: number } {
   let closestId: string | null = null;
-  let closestDist = 32;
+  let closestDist = 40; // larger hit radius for 48px agent sprites
 
   for (const agent of agents) {
     const dx = agent.position.x - worldX;
@@ -631,7 +637,7 @@ function findAgentAtCanvasPos(worldX: number, worldY: number): string | null {
     }
   }
 
-  return closestId;
+  return { id: closestId, dist: closestDist };
 }
 
 function setActionMode(mode: ActionMode): void {

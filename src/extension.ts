@@ -501,7 +501,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const agent = agentManager.getById(message.agentId);
         if (agent) {
           const terminal = getAgentTerminal(agent.id, agent.name, agent.agentType);
-          terminal.show();
+          terminal.show(false); // false = take focus, switch terminal
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
         }
@@ -815,8 +815,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   /** Create a terminal for a new agent and store the direct reference */
+  let agentTerminalCounter = 0;
   function createAgentTerminal(agentId: string, name: string, agentType: AgentType): vscode.Terminal {
-    const terminal = vscode.window.createTerminal({ name: agentTerminalName(name) });
+    agentTerminalCounter++;
+    const suffix = agentTerminalCounter > 1 ? ` #${agentTerminalCounter}` : '';
+    const terminal = vscode.window.createTerminal({ name: `${agentTerminalName(name)}${suffix}` });
     agentTerminals.set(agentId, terminal);
     const cmd = AGENT_TERMINAL_CMDS[agentType];
     if (cmd) { terminal.sendText(cmd); }
