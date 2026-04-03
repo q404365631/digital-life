@@ -112,6 +112,14 @@ export class MonitorManager {
       'rb', 'php', 'swift', 'kt', 'cs', 'c', 'cpp', 'h',
       'vue', 'svelte',
     ];
-    return sourceExtensions.includes(ext);
+    if (!sourceExtensions.includes(ext)) return false;
+
+    // Reject paths inside build output, dependencies, or hidden directories
+    const lowerPath = filePath.toLowerCase().replace(/\\/g, '/');
+    const rejected = [
+      '/node_modules/', '/dist/', '/build/', '/.next/', '/.nuxt/',
+      '/coverage/', '/.git/', '/.vscode/', '/out/',
+    ];
+    return !rejected.some(seg => lowerPath.includes(seg));
   }
 }
