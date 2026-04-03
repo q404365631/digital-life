@@ -41,6 +41,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const storage = new CreatureStorage(context.globalState);
   const creatureManager = new CreatureManager();
   const agentManager = new AgentManager();
+
+  // Direct terminal references — the ONLY source of truth for agent→terminal mapping
+  const agentTerminals: Map<string, vscode.Terminal> = new Map();
   let worldState: WorldData;
 
   // Restore state
@@ -485,17 +488,8 @@ export function activate(context: vscode.ExtensionContext): void {
           if (!pick) { return; }
           const agentType = pick.value;
           const agent = agentManager.addAgent(agentType, AGENT_NAMES[agentType] ?? 'Agent');
-          const terminal = vscode.window.createTerminal({ name: agentTerminalName(agent.name) });
+          const terminal = createAgentTerminal(agent.id, agent.name, agentType);
           terminal.show();
-          void terminal.processId.then(pid => {
-            if (pid !== undefined) {
-              agentManager.setTerminalId(agent.id, pid);
-            }
-          });
-          const cmd = AGENT_TERMINAL_CMDS[agentType];
-          if (cmd) {
-            terminal.sendText(cmd);
-          }
           agentManager.updateStatus(agent.id, 'running');
           panelProvider.postMessage({ type: 'agentAdded', agentId: agent.id });
           sendWorldUpdate();
@@ -506,32 +500,37 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'clickAgent': {
         const agent = agentManager.getById(message.agentId);
         if (agent) {
-          const termName = agentTerminalName(agent.name);
-          const existing = vscode.window.terminals.find(t =>
-            t.name === termName || t.name.toLowerCase().includes(agent.name.toLowerCase())
-          );
-          if (existing) {
-            existing.show();
-          } else {
-            const terminal = vscode.window.createTerminal({ name: termName });
-            terminal.show();
-            const cmd = AGENT_TERMINAL_CMDS[agent.agentType];
-            if (cmd) { terminal.sendText(cmd); }
-          }
+          const terminal = getAgentTerminal(agent.id, agent.name, agent.agentType);
+          terminal.show();
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
         }
         return true;
       }
-      case 'deleteAgent':
+      case 'deleteAgent': {
+        // Close the terminal too — terminal and agent are one unit
+        const delTerminal = agentTerminals.get(message.agentId);
+        if (delTerminal) {
+          agentTerminals.delete(message.agentId);
+          delTerminal.dispose();
+        }
         agentManager.removeAgent(message.agentId);
         sendWorldUpdate();
         saveState();
         return true;
-      case 'stopAgent':
-        agentManager.stopAgent(message.agentId);
+      }
+      case 'stopAgent': {
+        // Stop = close terminal = agent leaves
+        const stopTerminal = agentTerminals.get(message.agentId);
+        if (stopTerminal) {
+          agentTerminals.delete(message.agentId);
+          stopTerminal.dispose();
+        }
+        agentManager.removeAgent(message.agentId);
         sendWorldUpdate();
+        saveState();
         return true;
+      }
       case 'moveAgent':
         agentManager.moveAgent(message.agentId, message.position);
         saveState();
@@ -647,34 +646,18 @@ export function activate(context: vscode.ExtensionContext): void {
       || handleLifecycleMessage(message);
   });
 
-  // Terminal close handler for agents
+  // Terminal close handler for agents — terminal closed = agent leaves the plaza
   context.subscriptions.push(
-    vscode.window.onDidCloseTerminal((terminal) => {
-      void terminal.processId.then(closedPid => {
-        for (const agent of agentManager.getAll()) {
-          let matched = false;
-          // Prefer exact match by terminalId (process ID) when available
-          if (agent.terminalId !== null && closedPid !== undefined) {
-            matched = closedPid === agent.terminalId;
-          }
-          // Fallback: exact match by terminal name
-          if (!matched) {
-            matched = terminal.name === agentTerminalName(agent.name);
-          }
-          if (matched) {
-            const agentId = agent.id;
-            agentManager.updateStatus(agentId, 'done');
-            sendWorldUpdate();
-            setTimeout(() => {
-              const current = agentManager.getById(agentId);
-              if (current && current.status === 'done') {
-                agentManager.updateStatus(agentId, 'idle');
-                sendWorldUpdate();
-              }
-            }, 3000);
-          }
+    vscode.window.onDidCloseTerminal((closedTerminal) => {
+      for (const [agentId, storedTerminal] of agentTerminals) {
+        if (storedTerminal === closedTerminal) {
+          agentTerminals.delete(agentId);
+          agentManager.removeAgent(agentId);
+          sendWorldUpdate();
+          saveState();
+          return;
         }
-      });
+      }
     })
   );
 
@@ -831,7 +814,35 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  /** Create a terminal for a new agent and store the direct reference */
+  function createAgentTerminal(agentId: string, name: string, agentType: AgentType): vscode.Terminal {
+    const terminal = vscode.window.createTerminal({ name: agentTerminalName(name) });
+    agentTerminals.set(agentId, terminal);
+    const cmd = AGENT_TERMINAL_CMDS[agentType];
+    if (cmd) { terminal.sendText(cmd); }
+    return terminal;
+  }
+
+  /** Get the terminal for an agent — reuse existing or create new */
+  function getAgentTerminal(agentId: string, name: string, agentType: AgentType): vscode.Terminal {
+    // 1. Direct reference (most reliable)
+    const stored = agentTerminals.get(agentId);
+    if (stored && !stored.exitStatus) {
+      return stored;
+    }
+    // 2. Terminal was closed or lost — recreate
+    return createAgentTerminal(agentId, name, agentType);
+  }
+
   function findOrCreateClaudeTerminal(): { terminal: vscode.Terminal; isNew: boolean } {
+    // Check agent terminal map first (direct reference)
+    for (const [agentId, terminal] of agentTerminals) {
+      const agent = agentManager.getById(agentId);
+      if (agent?.agentType === 'claude' && !terminal.exitStatus) {
+        return { terminal, isNew: false };
+      }
+    }
+    // Fallback: search all terminals by name
     const existing = vscode.window.terminals.find(t =>
       t.name.toLowerCase().includes('claude') || t.name.includes('\uD83E\uDD16')
     );
