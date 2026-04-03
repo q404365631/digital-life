@@ -328,6 +328,17 @@ const eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = n
 // Feature D: Friendship pairs (creature ID pairs from import analysis)
 let friendshipPairs: readonly { a: string; b: string }[] = [];
 
+// ── Lineup (点呼) ───────────────────────────────────────────
+let lineupActive = false;
+
+// Trigger: click on status text ("Lives: N")
+statusText?.addEventListener('click', () => {
+  vscode.postMessage({ type: 'lineup' });
+});
+if (statusText) {
+  statusText.style.cursor = 'pointer';
+}
+
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
 type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
@@ -435,6 +446,11 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'agentAdded': {
       soundEngine.playAgentSpawn();
+      break;
+    }
+
+    case 'lineupActive': {
+      lineupActive = message.active;
       break;
     }
 
@@ -953,7 +969,7 @@ function gameLoop(timestamp: number): void {
         creatures: smoothCreatures, world: worldData, bugCount,
         zoom: zoomLevel, panX, panY,
         selectedCreatureId, draggingCreatureId,
-        agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs,
+        agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs, lineupActive,
       });
     }
   }

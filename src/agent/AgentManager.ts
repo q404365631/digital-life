@@ -7,14 +7,15 @@ function generateId(): string {
   return `agent_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 }
 
+/** Agents roam the bottom third of the canvas — natural zoning (中島聡) */
 function randomTarget(): Position {
-  const agentSize = 36;
+  const agentSize = 48;
   const marginX = agentSize;
-  const marginTop = agentSize + 14; // sprite height + name label
+  const zoneTop = CANVAS_HEIGHT * 0.6;   // bottom 40%
   const marginBottom = 20;
   return {
     x: marginX + Math.floor(Math.random() * (CANVAS_WIDTH - marginX * 2)),
-    y: marginTop + Math.floor(Math.random() * (CANVAS_HEIGHT - marginTop - marginBottom)),
+    y: zoneTop + Math.floor(Math.random() * (CANVAS_HEIGHT - zoneTop - marginBottom)),
   };
 }
 
@@ -107,6 +108,21 @@ export class AgentManager {
       return;
     }
     this.agents.set(agentId, { ...agent, isSitting: !agent.isSitting, targetPosition: null });
+  }
+
+  setTargetPosition(agentId: string, target: Position): void {
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      this.agents.set(agentId, { ...agent, targetPosition: target });
+    }
+  }
+
+  clearAllTargets(): void {
+    for (const [id, agent] of this.agents) {
+      if (agent.targetPosition) {
+        this.agents.set(id, { ...agent, targetPosition: null });
+      }
+    }
   }
 
   removeAgent(agentId: string): void {

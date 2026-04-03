@@ -18,6 +18,7 @@ export interface RenderContext {
   agentChats: Map<string, { message: string; timestamp: number }>;
   eventSpeechOverrides: Map<string, { text: string; timestamp: number }>;
   friendPairs: readonly { a: string; b: string }[];
+  lineupActive: boolean;
 }
 
 export class GameRenderer {
@@ -96,7 +97,7 @@ export class GameRenderer {
     const {
       creatures, world, bugCount, zoom, panX: panOffsetX, panY: panOffsetY,
       selectedCreatureId, draggingCreatureId, agents, agentChats,
-      eventSpeechOverrides, friendPairs,
+      eventSpeechOverrides, friendPairs, lineupActive,
     } = rc;
 
     // Clear entire canvas (before any transform)
@@ -135,6 +136,7 @@ export class GameRenderer {
       else { eventSpeechOverrides.delete(id); }
     }
     this.spriteRenderer.setEventSpeech(activeSpeech);
+    this.spriteRenderer.setLineupMode(lineupActive);
 
     // Draw creatures
     for (const creature of creatures) {

@@ -140,6 +140,23 @@ export class CreatureManager {
     }
   }
 
+  /** Set walk target (creature animates toward it) */
+  setTargetPosition(creatureId: string, target: Position): void {
+    const creature = this.creatures.get(creatureId);
+    if (creature && creature.stage !== 'egg') {
+      this.creatures.set(creatureId, { ...creature, targetPosition: target });
+    }
+  }
+
+  /** Clear all walk targets — creatures resume free movement */
+  clearAllTargets(): void {
+    for (const [id, creature] of this.creatures) {
+      if (creature.targetPosition) {
+        this.creatures.set(id, { ...creature, targetPosition: null });
+      }
+    }
+  }
+
   feedAll(): void {
     for (const [id, creature] of this.creatures) {
       this.creatures.set(id, feedCreature(creature));

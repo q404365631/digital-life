@@ -26,12 +26,19 @@ export class SpriteRenderer {
   // Event-driven speech overrides (Feature A: Living words)
   private eventSpeech: Map<string, string> = new Map();
 
+  // Lineup mode — show all labels (点呼)
+  private lineupMode = false;
+
   setHealedIds(ids: Set<string>): void {
     this.healedIds = ids;
   }
 
   setEventSpeech(overrides: Map<string, string>): void {
     this.eventSpeech = overrides;
+  }
+
+  setLineupMode(active: boolean): void {
+    this.lineupMode = active;
   }
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -217,8 +224,8 @@ export class SpriteRenderer {
       const baseY = creature.position.y - renderSize / 2 - 6;
       const lvColor = isAdult ? '#FFD700' : creature.stage === 'baby' ? '#90CAF9' : '#AAAAAA';
 
-      if (isSelected) {
-        // ── Selected: name + Lv + file path ──
+      if (isSelected || this.lineupMode) {
+        // ── Selected / Lineup: name + Lv (+ file path if selected) ──
         this.ctx.save();
 
         // Name + Lv line
@@ -244,27 +251,41 @@ export class SpriteRenderer {
         this.ctx.textAlign = 'left';
         this.ctx.fillText(lvText, cx + nameW / 2 - lvW / 2 + 3, baseY);
 
-        // File path line (shortened)
-        const fullPath = creature.sourceFile;
-        const shortPath = fullPath.split('/').slice(-2).join('/');
-        this.ctx.font = '7px sans-serif';
-        this.ctx.textAlign = 'center';
-        const pathW = this.ctx.measureText(shortPath).width;
+        // File path — only for individually selected creature (not lineup)
+        if (isSelected) {
+          const fullPath = creature.sourceFile;
+          const shortPath = fullPath.split('/').slice(-2).join('/');
+          this.ctx.font = '7px sans-serif';
+          this.ctx.textAlign = 'center';
+          const pathW = this.ctx.measureText(shortPath).width;
 
-        this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        this.ctx.beginPath();
-        this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
-        this.ctx.fill();
+          this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          this.ctx.beginPath();
+          this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
+          this.ctx.fill();
 
-        this.ctx.fillStyle = '#90CAF9';
-        this.ctx.fillText(shortPath, cx, baseY - 13);
+          this.ctx.fillStyle = '#90CAF9';
+          this.ctx.fillText(shortPath, cx, baseY - 13);
 
-        // Selection ring
-        this.ctx.strokeStyle = 'rgba(255,215,0,0.6)';
-        this.ctx.lineWidth = 1.5;
-        this.ctx.beginPath();
-        this.ctx.arc(creature.position.x, creature.position.y, renderSize / 2 + 3, 0, Math.PI * 2);
-        this.ctx.stroke();
+          // Selection ring
+          this.ctx.strokeStyle = 'rgba(255,215,0,0.6)';
+          this.ctx.lineWidth = 1.5;
+          this.ctx.beginPath();
+          this.ctx.arc(creature.position.x, creature.position.y, renderSize / 2 + 3, 0, Math.PI * 2);
+          this.ctx.stroke();
+        }
+
+        // Lineup: health indicator dot
+        if (this.lineupMode) {
+          const h = creature.fileHealth;
+          const dotColor = h.bugCount > 0 ? '#EF5350' :
+                           h.lineCount > 400 ? '#FFA726' :
+                           creature.hunger < 20 ? '#FFEE58' : '#66BB6A';
+          this.ctx.fillStyle = dotColor;
+          this.ctx.beginPath();
+          this.ctx.arc(cx + rowW / 2 + 6, baseY - 4, 3, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
 
         this.ctx.restore();
       } else {
@@ -519,6 +540,21 @@ export class SpriteRenderer {
       this.ctx.stroke();
       this.ctx.restore();
     }
+
+    // Agent glow — blue light circle at feet (Bret Victor: "機械的な光の輪")
+    const pulse = 0.25 + Math.sin(Date.now() / 800) * 0.1;
+    this.ctx.save();
+    const grad = this.ctx.createRadialGradient(
+      agent.position.x, agent.position.y, 2,
+      agent.position.x, agent.position.y, renderSize / 2 + 4,
+    );
+    grad.addColorStop(0, `rgba(100, 180, 255, ${pulse})`);
+    grad.addColorStop(1, 'transparent');
+    this.ctx.fillStyle = grad;
+    this.ctx.beginPath();
+    this.ctx.ellipse(agent.position.x, agent.position.y, renderSize / 2 + 4, 6, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
 
     const time = Date.now() / 250;
     const bounce = agent.isSitting ? 0 : (isMoving ? Math.sin(time * 2) * 2 : Math.sin(time) * 0.5);

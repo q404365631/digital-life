@@ -8,7 +8,7 @@ import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone }
 import { getSpeciesForFile } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
-import { MAX_CREATURES } from './constants';
+import { MAX_CREATURES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
 import { AgentManager } from './agent/AgentManager';
 import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
 import { analyzeFriendships } from './monitor/ImportAnalyzer';
@@ -558,6 +558,55 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  // ── Lineup (点呼) ─────────────────────────────────────────
+  let lineupTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function performLineup(): void {
+    // Cancel any active lineup timer
+    if (lineupTimer) { clearTimeout(lineupTimer); }
+
+    const allCreatures = creatureManager.getAll().filter(c => c.stage !== 'egg');
+    const allAgents = agentManager.getAll();
+
+    // Grid layout: creatures in upper rows, agents in lower row
+    const cols = Math.max(4, Math.ceil(Math.sqrt(allCreatures.length + allAgents.length)));
+    const cellW = CANVAS_WIDTH / (cols + 1);
+    const cellH = 50;
+    const startY = 50;
+
+    // Place creatures in grid
+    allCreatures.forEach((c, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      creatureManager.setTargetPosition(c.id, {
+        x: cellW * (col + 1),
+        y: startY + cellH * row,
+      });
+    });
+
+    // Place agents in bottom row
+    const agentY = CANVAS_HEIGHT - 60;
+    const agentCellW = CANVAS_WIDTH / (allAgents.length + 1);
+    allAgents.forEach((a, i) => {
+      agentManager.setTargetPosition(a.id, {
+        x: agentCellW * (i + 1),
+        y: agentY,
+      });
+    });
+
+    panelProvider.postMessage({ type: 'lineupActive', active: true });
+    sendWorldUpdate();
+
+    // Auto-dismiss after 5 seconds
+    lineupTimer = setTimeout(() => {
+      creatureManager.clearAllTargets();
+      agentManager.clearAllTargets();
+      panelProvider.postMessage({ type: 'lineupActive', active: false });
+      sendWorldUpdate();
+      lineupTimer = null;
+    }, 5000);
+  }
+
   function handleLifecycleMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
       case 'ready':
@@ -567,6 +616,9 @@ export function activate(context: vscode.ExtensionContext): void {
           broadcastSpeech('morning');
         }
         setTimeout(() => updateFriendships(), 3000);
+        return true;
+      case 'lineup':
+        performLineup();
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
