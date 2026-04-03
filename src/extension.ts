@@ -646,6 +646,10 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
+    // DEBUG: log EVERY message from webview
+    if (message.type === 'selectAgent' || message.type === 'clickAgent') {
+      void vscode.window.showInformationMessage(`[MSG] type=${message.type}`);
+    }
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
