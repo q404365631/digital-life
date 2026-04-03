@@ -12,7 +12,6 @@ interface SheetPair {
 interface SpriteStore {
   creatures: Record<string, SheetPair>;
   agents: Record<string, SheetPair>;
-  backgrounds: { tiles?: string; rooms: Record<string, string> };
 }
 
 export class SpriteRenderer {
@@ -40,14 +39,6 @@ export class SpriteRenderer {
       this.loadImage(`agent_${index}_actions`, pair.actions);
     }
 
-    if (sprites.backgrounds) {
-      if (sprites.backgrounds.tiles) {
-        this.loadImage('bg_tiles', sprites.backgrounds.tiles);
-      }
-      for (const [key, url] of Object.entries(sprites.backgrounds.rooms)) {
-        this.loadImage(`bg_${key}`, url);
-      }
-    }
   }
 
   getImage(key: string): HTMLImageElement | null {

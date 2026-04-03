@@ -15,23 +15,12 @@ export class GameRenderer {
   // Feed drop animation
   private feedEffects: { x: number; y: number; startTime: number }[] = [];
 
-  // Background image index
-  private currentBgIndex: number = 0;
-
   // Selected agent for keyboard control
   private selectedAgentId: string | null = null;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.spriteRenderer = new SpriteRenderer(ctx);
     this.uiRenderer = new UIRenderer(ctx);
-  }
-
-  setBgIndex(index: number): void {
-    this.currentBgIndex = index;
-  }
-
-  getBgIndex(): number {
-    return this.currentBgIndex;
   }
 
   setSelectedAgentId(id: string | null): void {
@@ -71,16 +60,9 @@ export class GameRenderer {
     this.ctx.translate(panOffsetX, panOffsetY);
     this.ctx.scale(zoom, zoom);
 
-    // Draw background room image
-    const bgKey = `bg_${this.currentBgIndex}`;
-    const bgImg = this.spriteRenderer.getImage(bgKey);
-    if (bgImg) {
-      this.ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    } else {
-      // Fallback: solid color
-      this.ctx.fillStyle = '#1A1A2E';
-      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
+    // Solid background color (no background image)
+    this.ctx.fillStyle = '#1A1A2E';
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Draw gravestones
     for (const grave of world.graveStones) {

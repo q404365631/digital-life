@@ -98,7 +98,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     }
 
     const agentSprites: Record<string, { sheet: string; actions: string }> = {};
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       agentSprites[String(i)] = {
         sheet: webview.asWebviewUri(
           vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_sheet.png`)
@@ -108,18 +108,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         ).toString(),
       };
     }
-
-    // Background images
-    const bgTilesUrl = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', 'bg_tiles.png')
-    ).toString();
-    const bgRooms: Record<string, string> = {};
-    for (let i = 0; i < 3; i++) {
-      bgRooms[String(i)] = webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `bg_room_${i}.png`)
-      ).toString();
-    }
-    const bgSprites = { tiles: bgTilesUrl, rooms: bgRooms };
 
     return `<!DOCTYPE html>
 <html lang="ja">
@@ -135,7 +123,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     window.__SPRITES__ = {
       creatures: ${JSON.stringify(creatureSprites)},
       agents: ${JSON.stringify(agentSprites)},
-      backgrounds: ${JSON.stringify(bgSprites)},
     };
   </script>
   <div id="app">

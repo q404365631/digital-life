@@ -41,7 +41,7 @@ export class AgentManager {
       targetPosition: null,
       terminalId: null,
       createdAt: Date.now(),
-      spriteIndex: this.nextSpriteIndex % 5,
+      spriteIndex: this.nextSpriteIndex % 3,
       isPlayerControlled: false,
       isSitting: false,
     };
