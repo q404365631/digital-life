@@ -89,19 +89,10 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     const jsPath = path.join(this.extensionUri.fsPath, 'dist', 'webview', 'main.js');
     const cssPath = path.join(this.extensionUri.fsPath, 'dist', 'webview', 'styles.css');
 
-    // eslint-disable-next-line no-console
-    console.log('[Digital Life] extensionUri:', this.extensionUri.fsPath);
-    // eslint-disable-next-line no-console
-    console.log('[Digital Life] jsPath:', jsPath);
-    // eslint-disable-next-line no-console
-    console.log('[Digital Life] jsExists:', fs.existsSync(jsPath));
-
     let inlineJs = '';
     let inlineCss = '';
     try { inlineJs = fs.readFileSync(jsPath, 'utf8'); } catch { /* */ }
     try { inlineCss = fs.readFileSync(cssPath, 'utf8'); } catch { /* */ }
-    // eslint-disable-next-line no-console
-    console.log('[Digital Life] inlineJs length:', inlineJs.length, 'inlineCss length:', inlineCss.length);
 
     const nonce = getNonce();
 
@@ -134,7 +125,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   <title>Digital Life</title>
 </head>
 <body>
-  <div style="background:red;color:white;font-size:24px;text-align:center;padding:10px;z-index:9999;position:fixed;top:0;left:0;right:0;">v2 TEST - THIS IS OUR CODE</div>
   <script nonce="${nonce}">
     window.__SPRITES__ = {
       creatures: ${JSON.stringify(creatureSprites)},
