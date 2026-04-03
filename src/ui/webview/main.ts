@@ -212,6 +212,7 @@ let draggingAgentId: string | null = null;
 let dragStartX = 0;
 let dragStartY = 0;
 let dragMoved = false;
+let tapHandledByPointerUp = false; // suppress click after pointerup tap
 const dragOverridePositions: Map<string, { x: number; y: number }> = new Map();
 
 canvas.addEventListener('pointermove', (event: PointerEvent) => {
@@ -267,6 +268,7 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
       selectedCreatureId = creatureId;
       soundEngine.playSelectCreature();
       vscode.postMessage({ type: 'revealFile', creatureId });
+      tapHandledByPointerUp = true; // suppress duplicate click event
     }
     dragOverridePositions.delete(creatureId);
     draggingCreatureId = null;
@@ -289,6 +291,7 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
       soundEngine.playSelectAgent();
       vscode.postMessage({ type: 'selectAgent', agentId });
       vscode.postMessage({ type: 'clickAgent', agentId });
+      tapHandledByPointerUp = true; // suppress duplicate click event
     }
     dragOverridePositions.delete(agentId);
     draggingAgentId = null;
@@ -485,6 +488,11 @@ canvas.addEventListener('click', (event: MouseEvent) => {
   // Skip if we just finished dragging a creature
   if (dragMoved) {
     dragMoved = false;
+    return;
+  }
+  // Skip if pointerup already handled this tap (prevents double-fire)
+  if (tapHandledByPointerUp) {
+    tapHandledByPointerUp = false;
     return;
   }
   panMoved = false;
