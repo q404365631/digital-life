@@ -3,8 +3,62 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
 import { t } from '../i18n';
 
+interface HealthCache {
+  totalLines: number;
+  totalBugs: number;
+  healthyFiles: number;
+  fatFiles: number;
+  abandonedFiles: number;
+  avgLevel: number;
+  score: number;
+  creatureCount: number;
+}
+
 export class UIRenderer {
+  private healthCache: HealthCache | null = null;
+
   constructor(private readonly ctx: CanvasRenderingContext2D) {}
+
+  /** Recompute health stats — call once per worldUpdate, not every frame */
+  updateHealthCache(creatures: readonly CreatureData[]): void {
+    if (creatures.length === 0) {
+      this.healthCache = null;
+      return;
+    }
+
+    let totalLines = 0;
+    let totalBugs = 0;
+    let healthyFiles = 0;
+    let fatFiles = 0;
+    let abandonedFiles = 0;
+    let totalLevel = 0;
+
+    for (const c of creatures) {
+      if (c.stage === 'egg') { continue; }
+      const h = c.fileHealth;
+      totalLines += h.lineCount;
+      totalBugs += h.bugCount;
+      totalLevel += c.level;
+      if (h.bugCount === 0 && h.lineCount > 0 && h.lineCount <= 100) { healthyFiles++; }
+      if (h.lineCount > 300) { fatFiles++; }
+      const daysSince = (Date.now() - h.lastModified) / (1000 * 60 * 60 * 24);
+      if (daysSince > 3) { abandonedFiles++; }
+    }
+
+    const activeCreatures = creatures.filter(c => c.stage !== 'egg').length;
+    const avgLevel = activeCreatures > 0 ? Math.round(totalLevel / activeCreatures * 10) / 10 : 0;
+
+    let score = 100;
+    if (activeCreatures > 0) {
+      score -= Math.min(30, totalBugs * 5);
+      score -= Math.min(20, fatFiles * 10);
+      score -= Math.min(20, abandonedFiles * 10);
+      score += Math.min(20, healthyFiles * 5);
+      score = Math.max(0, Math.min(100, score));
+    }
+
+    this.healthCache = { totalLines, totalBugs, healthyFiles, fatFiles, abandonedFiles, avgLevel, score, creatureCount: creatures.length };
+  }
 
   renderCreatureCount(count: number): void {
     this.ctx.save();
@@ -169,41 +223,10 @@ export class UIRenderer {
     this.ctx.restore();
   }
 
-  renderHealthReport(creatures: readonly CreatureData[]): void {
-    if (creatures.length === 0) { return; }
+  renderHealthReport(): void {
+    if (!this.healthCache) { return; }
 
-    // Aggregate health metrics
-    let totalLines = 0;
-    let totalBugs = 0;
-    let healthyFiles = 0;
-    let fatFiles = 0;
-    let abandonedFiles = 0;
-    let totalLevel = 0;
-
-    for (const c of creatures) {
-      if (c.stage === 'egg') { continue; }
-      const h = c.fileHealth;
-      totalLines += h.lineCount;
-      totalBugs += h.bugCount;
-      totalLevel += c.level;
-      if (h.bugCount === 0 && h.lineCount > 0 && h.lineCount <= 100) { healthyFiles++; }
-      if (h.lineCount > 300) { fatFiles++; }
-      const daysSince = (Date.now() - h.lastModified) / (1000 * 60 * 60 * 24);
-      if (daysSince > 3) { abandonedFiles++; }
-    }
-
-    const activeCreatures = creatures.filter(c => c.stage !== 'egg').length;
-    const avgLevel = activeCreatures > 0 ? Math.round(totalLevel / activeCreatures * 10) / 10 : 0;
-
-    // Health score: 0-100
-    let score = 100;
-    if (activeCreatures > 0) {
-      score -= Math.min(30, totalBugs * 5);
-      score -= Math.min(20, fatFiles * 10);
-      score -= Math.min(20, abandonedFiles * 10);
-      score += Math.min(20, healthyFiles * 5);
-      score = Math.max(0, Math.min(100, score));
-    }
+    const { totalLines, totalBugs, healthyFiles, fatFiles, abandonedFiles, avgLevel, score } = this.healthCache;
 
     // Render panel at top-right area
     const panelW = 130;

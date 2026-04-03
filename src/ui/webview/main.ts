@@ -325,6 +325,8 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       if (!selectedCreatureId && creatures.length > 0) {
         selectedCreatureId = creatures[0].id;
       }
+      // Update health report cache (once per update, not every frame)
+      renderer.updateHealthCache(creatures);
       break;
 
     case 'creatureBorn':

@@ -53,6 +53,36 @@ export function activate(context: vscode.ExtensionContext): void {
     isFirstRun = true;
   }
 
+  // Status bar item — always visible feedback
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+  statusBarItem.command = 'digitalLife.adoptFiles';
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+
+  function updateStatusBar(): void {
+    const all = creatureManager.getAll();
+    const count = all.length;
+    const hungry = all.filter(c => c.stage !== 'egg' && c.hunger < 30).length;
+    const totalLevel = all.reduce((sum, c) => sum + c.level, 0);
+    const avgLevel = count > 0 ? (totalLevel / count).toFixed(1) : '0';
+
+    let icon = '\uD83D\uDC23'; // hatching chick
+    if (hungry > 0) {
+      icon = '\uD83D\uDE2D'; // crying - someone is hungry
+    } else if (count > 0) {
+      icon = '\uD83D\uDC9A'; // green heart - all healthy
+    }
+
+    statusBarItem.text = `${icon} ${count} lives | Lv.${avgLevel}`;
+    if (hungry > 0) {
+      statusBarItem.tooltip = `Digital Life: ${hungry} creature(s) hungry! Click to manage.`;
+    } else {
+      statusBarItem.tooltip = `Digital Life: ${count} creatures, Avg Lv.${avgLevel}`;
+    }
+  }
+
+  updateStatusBar();
+
   // DNA Analyzer
   const dnaAnalyzer = new DNAAnalyzer(workspacePath);
   let currentDNA: CodingDNA = defaultDNA();
@@ -140,7 +170,12 @@ export function activate(context: vscode.ExtensionContext): void {
       saveState();
     },
     onFileHealthChanged: (filePath: string, health: FileHealth) => {
-      creatureManager.updateFileHealth(filePath, health);
+      const result = creatureManager.updateFileHealth(filePath, health);
+      if (result?.improved) {
+        // File got healthier! Trigger celebration effect
+        panelProvider.postMessage({ type: 'commitDetected' }); // reuse sparkle effect
+        updateStatusBar();
+      }
       sendWorldUpdate();
       saveState();
     },
@@ -328,6 +363,7 @@ export function activate(context: vscode.ExtensionContext): void {
     creatureManager.tick(TICK_INTERVAL);
     agentManager.tick();
     sendWorldUpdate();
+    throttledStatusBarUpdate();
   }, TICK_INTERVAL);
 
   function startTickTimer(): void {
@@ -338,6 +374,7 @@ export function activate(context: vscode.ExtensionContext): void {
       creatureManager.tick(TICK_INTERVAL);
       agentManager.tick();
       sendWorldUpdate();
+      throttledStatusBarUpdate();
     }, TICK_INTERVAL);
   }
 
@@ -586,6 +623,16 @@ export function activate(context: vscode.ExtensionContext): void {
       agents: agentManager.getAll(),
     };
     panelProvider.postMessage(msg);
+  }
+
+  // Throttled status bar updates (every 5 seconds max)
+  let lastStatusBarUpdate = 0;
+  function throttledStatusBarUpdate(): void {
+    const now = Date.now();
+    if (now - lastStatusBarUpdate > 5000) {
+      lastStatusBarUpdate = now;
+      updateStatusBar();
+    }
   }
 
   function saveState(): void {

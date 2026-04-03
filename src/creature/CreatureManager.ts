@@ -90,12 +90,32 @@ export class CreatureManager {
     }
   }
 
-  updateFileHealth(sourceFile: string, health: FileHealth): void {
+  /** Update file health and return improvement info for reward calculation */
+  updateFileHealth(sourceFile: string, health: FileHealth): { improved: boolean; bugsDelta: number; linesDelta: number } | null {
     const creatureId = this.fileToCreatureId.get(sourceFile);
-    if (!creatureId) {return;}
+    if (!creatureId) { return null; }
     const creature = this.creatures.get(creatureId);
-    if (!creature) {return;}
-    this.creatures.set(creatureId, { ...creature, fileHealth: health });
+    if (!creature) { return null; }
+
+    const prev = creature.fileHealth;
+    const bugsDelta = prev.bugCount - health.bugCount;  // positive = bugs fixed
+    const linesDelta = prev.lineCount - health.lineCount; // positive = lines reduced
+
+    let expReward = 0;
+    if (bugsDelta > 0) { expReward += bugsDelta * 10; }  // 10 EXP per bug fixed
+    if (linesDelta > 50) { expReward += 15; }             // 15 EXP for significant slimming
+
+    let updated: CreatureData = { ...creature, fileHealth: health };
+    if (expReward > 0) {
+      updated = addExp(updated, expReward);
+    }
+    this.creatures.set(creatureId, updated);
+
+    return {
+      improved: expReward > 0,
+      bugsDelta,
+      linesDelta,
+    };
   }
 
   moveCreature(creatureId: string, position: Position): void {

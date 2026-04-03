@@ -27,6 +27,11 @@ export class GameRenderer {
     this.selectedAgentId = id;
   }
 
+  /** Update cached health stats — call once per worldUpdate, not every frame */
+  updateHealthCache(creatures: readonly CreatureData[]): void {
+    this.uiRenderer.updateHealthCache(creatures);
+  }
+
   triggerCommitEffect(): void {
     this.commitEffectProgress = 1.0;
     this.commitEffectStart = Date.now();
@@ -125,8 +130,8 @@ export class GameRenderer {
       }
     }
 
-    // Code health report
-    this.uiRenderer.renderHealthReport(creatures);
+    // Code health report (uses cached stats)
+    this.uiRenderer.renderHealthReport();
 
     // Commit effect (UI layer)
     this.updateCommitEffect();
