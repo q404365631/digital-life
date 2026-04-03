@@ -485,7 +485,17 @@ export function activate(context: vscode.ExtensionContext): void {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
           if (switchTerminal && !switchTerminal.exitStatus) {
-            switchTerminal.show(true);
+            // Use VS Code terminal navigation commands instead of terminal.show()
+            void (async () => {
+              // 1. Focus the terminal panel
+              await vscode.commands.executeCommand('workbench.action.terminal.focus');
+              // 2. Cycle through terminals until we find the right one
+              let attempts = vscode.window.terminals.length;
+              while (attempts-- > 0) {
+                if (vscode.window.activeTerminal === switchTerminal) { break; }
+                await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
+              }
+            })();
           }
           return true;
         }
