@@ -154,9 +154,12 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     onCommitDetected: (_sha: string) => {
       creatureManager.feedAll();
-      creatureManager.commitBonus();
+      const leveledUp = creatureManager.commitBonus();
       worldState = updateWeather(worldState, 0);
       panelProvider.postMessage({ type: 'commitDetected' });
+      for (const id of leveledUp) {
+        panelProvider.postMessage({ type: 'levelUp', creatureId: id });
+      }
       sendWorldUpdate();
       saveState();
       void dnaAnalyzer.analyze().then(dna => { currentDNA = dna; });
@@ -326,6 +329,19 @@ export function activate(context: vscode.ExtensionContext): void {
         saveState();
         break;
       }
+      case 'spawnFile': {
+        // Webview asks to spawn a specific file as a creature (used during first-run ceremony)
+        if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
+          const species = getSpeciesForFile(message.filePath);
+          const creature = creatureManager.spawnCreature(message.filePath, message.name, species, currentDNA);
+          if (creature) {
+            panelProvider.postMessage({ type: 'creatureBorn', creature });
+            saveState();
+            sendWorldUpdate();
+          }
+        }
+        break;
+      }
       case 'revealFile': {
         const revealCreature = creatureManager.getById(message.creatureId);
         if (revealCreature) {
@@ -451,43 +467,38 @@ export function activate(context: vscode.ExtensionContext): void {
   // Start monitoring
   void monitorManager.start();
 
-  // Auto-adopt files on first run (initial experience)
+  // First run: scan existing files and send to webview for ceremony
   if (isFirstRun) {
-    void autoAdoptFiles();
+    void scanExistingFiles();
   }
 
-  async function autoAdoptFiles(): Promise<void> {
+  async function scanExistingFiles(): Promise<void> {
     const files = await vscode.workspace.findFiles(
       '**/*.{ts,tsx,js,jsx,py,go,rs,java,rb,php,swift,kt,cs,c,cpp,h,vue,svelte}',
       '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/.next/**}'
     );
 
-    // Limit to first 20 files to avoid overwhelming new users
-    const limit = Math.min(files.length, 20);
-    let adoptedCount = 0;
+    if (files.length === 0) { return; }
 
-    for (let i = 0; i < limit; i++) {
-      if (creatureManager.getCount() >= MAX_CREATURES) { break; }
-      const filePath = files[i].fsPath;
-      if (creatureManager.hasCreatureForFile(filePath)) { continue; }
+    // Sort by modification time (most recent first) — that file becomes the "first friend"
+    const withStats = await Promise.all(
+      files.slice(0, MAX_CREATURES).map(async f => {
+        try {
+          const stat = await vscode.workspace.fs.stat(f);
+          return { uri: f, mtime: stat.mtime };
+        } catch { return { uri: f, mtime: 0 }; }
+      })
+    );
+    withStats.sort((a, b) => b.mtime - a.mtime);
 
-      const species = getSpeciesForFile(filePath);
-      const fileName = path.basename(filePath);
-      const name = fileName.replace(/\.[^.]+$/, '');
-      const creature = creatureManager.spawnCreature(filePath, name, species, currentDNA);
-      if (creature) {
-        panelProvider.postMessage({ type: 'creatureBorn', creature });
-        adoptedCount++;
-      }
-    }
+    const fileList = withStats.map(f => ({
+      path: f.uri.fsPath,
+      name: path.basename(f.uri.fsPath).replace(/\.[^.]+$/, ''),
+      species: getSpeciesForFile(f.uri.fsPath),
+    }));
 
-    if (adoptedCount > 0) {
-      saveState();
-      sendWorldUpdate();
-      void vscode.window.showInformationMessage(
-        `Digital Life: ${adoptedCount} creatures born from your code! 🎉`
-      );
-    }
+    // Send to webview — it will orchestrate the ceremony
+    panelProvider.postMessage({ type: 'firstRun', files: fileList });
   }
 
   // Cleanup
@@ -530,76 +541,28 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('digitalLife.adoptFiles', async () => {
+      // Scan workspace and spawn creatures for any files not yet represented
       const files = await vscode.workspace.findFiles(
         '**/*.{ts,tsx,js,jsx,py,go,rs,java,rb,php,swift,kt,cs,c,cpp,h,vue,svelte}',
         '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/.next/**}'
       );
 
-      const unadopted = files.filter(f => !creatureManager.hasCreatureForFile(f.fsPath));
-
-      if (unadopted.length === 0) {
-        void vscode.window.showInformationMessage('Digital Life: All source files already have creatures!');
-        return;
-      }
-
-      interface AdoptQuickPickItem extends vscode.QuickPickItem {
-        fsPath?: string;
-        all: boolean;
-      }
-
-      const items: AdoptQuickPickItem[] = [
-        {
-          label: '$(checklist) Adopt all files',
-          description: `${unadopted.length} files`,
-          all: true,
-        },
-        ...unadopted.map(f => ({
-          label: path.basename(f.fsPath),
-          description: vscode.workspace.asRelativePath(f),
-          fsPath: f.fsPath,
-          all: false,
-        })),
-      ];
-
-      const selected = await vscode.window.showQuickPick(items, {
-        canPickMany: true,
-        placeHolder: 'Select files to adopt as creatures',
-      });
-
-      if (!selected || selected.length === 0) {
-        return;
-      }
-
-      const adoptAll = selected.some(item => item.all);
-      const filesToAdopt = adoptAll
-        ? unadopted.map(f => f.fsPath)
-        : selected.filter(item => !item.all && item.fsPath).map(item => item.fsPath!);
-
-      let adoptedCount = 0;
-      for (const filePath of filesToAdopt) {
-        if (creatureManager.getCount() >= MAX_CREATURES) {
-          void vscode.window.showWarningMessage(
-            `Digital Life: Reached maximum creature limit (${MAX_CREATURES}). Adopted ${adoptedCount} creatures.`
-          );
-          break;
-        }
-
-        const species = getSpeciesForFile(filePath);
-        const fileName = path.basename(filePath);
-        const name = fileName.replace(/\.[^.]+$/, '');
-        const creature = creatureManager.spawnCreature(filePath, name, species, currentDNA);
+      let count = 0;
+      for (const f of files) {
+        if (creatureManager.getCount() >= MAX_CREATURES) { break; }
+        if (creatureManager.hasCreatureForFile(f.fsPath)) { continue; }
+        const species = getSpeciesForFile(f.fsPath);
+        const name = path.basename(f.fsPath).replace(/\.[^.]+$/, '');
+        const creature = creatureManager.spawnCreature(f.fsPath, name, species, currentDNA);
         if (creature) {
           panelProvider.postMessage({ type: 'creatureBorn', creature });
-          adoptedCount++;
+          count++;
         }
       }
 
-      if (adoptedCount > 0) {
+      if (count > 0) {
         saveState();
         sendWorldUpdate();
-        void vscode.window.showInformationMessage(
-          `Digital Life: Adopted ${adoptedCount} file(s) as creatures!`
-        );
       }
     })
   );

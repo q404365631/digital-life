@@ -348,6 +348,16 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       soundEngine.playCommit();
       break;
 
+    case 'levelUp': {
+      // Level-up celebration — sparkle effect on the creature
+      const lvCreature = creatures.find(c => c.id === message.creatureId);
+      if (lvCreature) {
+        renderer.triggerFeedEffect(lvCreature.position.x, lvCreature.position.y);
+        soundEngine.playHatch();
+      }
+      break;
+    }
+
     case 'bugCountChanged':
       bugCount = message.count;
       break;
@@ -358,13 +368,18 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
     }
 
     case 'aiActionPreview': {
-      // Show approval UI for AI action
       pendingAiAction = {
         creatureId: message.creatureId,
         action: message.action,
         description: message.description,
       };
       showAiApproval(message.description);
+      break;
+    }
+
+    case 'firstRun': {
+      // Ceremony: files already exist → spawn them as creatures one by one
+      beginFirstRunCeremony(message.files as { path: string; name: string; species: string }[]);
       break;
     }
   }
@@ -654,6 +669,84 @@ function hideAiApproval(): void {
   const cancelBtn = document.getElementById('btn-cancel-ai');
   approveBtn?.classList.add('hidden');
   cancelBtn?.classList.add('hidden');
+}
+
+// ── First-run ceremony ─────────────────────────────────────
+// Files already exist in the workspace. They ARE the creatures.
+// The first file (most recently edited) gets a special introduction.
+// The rest appear gradually — they were always here, waiting.
+
+function beginFirstRunCeremony(files: { path: string; name: string; species: string }[]): void {
+  if (files.length === 0) return;
+
+  // First friend: spawn immediately as egg (it will hatch via normal hatch logic)
+  const first = files[0];
+  vscode.postMessage({ type: 'spawnFile', filePath: first.path, name: first.name });
+
+  // Show naming prompt in the edu-message area after a short delay (hatch time)
+  setTimeout(() => {
+    showNamingPrompt(first.name);
+  }, 2500);
+
+  // Remaining files: appear in small batches, staggered
+  // They were always here — quiet arrival, no fanfare
+  const rest = files.slice(1);
+  const BATCH = 3;
+  const INTERVAL = 1800;
+
+  for (let i = 0; i < rest.length; i++) {
+    const delay = 5000 + Math.floor(i / BATCH) * INTERVAL;
+    const file = rest[i];
+    setTimeout(() => {
+      vscode.postMessage({ type: 'spawnFile', filePath: file.path, name: file.name });
+    }, delay);
+  }
+}
+
+/** Inline naming prompt — no VS Code modal, lives inside the panel */
+function showNamingPrompt(defaultName: string): void {
+  const toolbar = document.getElementById('toolbar-right');
+  if (!toolbar) return;
+
+  // Create inline input
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;align-items:center;gap:4px;';
+
+  const label = document.createElement('span');
+  label.style.cssText = 'font-size:11px;color:#a0c4ff;';
+  label.textContent = t('bubble_evolve');
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = defaultName;
+  input.style.cssText = 'width:80px;padding:2px 6px;border:1px solid #0f3460;border-radius:4px;background:#16213e;color:#e0e0e0;font-size:11px;outline:none;';
+  input.placeholder = defaultName;
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'tool-btn';
+  confirmBtn.style.cssText = 'font-size:10px;padding:2px 8px;';
+  confirmBtn.textContent = t('approve');
+
+  const commit = () => {
+    const name = input.value.trim() || defaultName;
+    // Rename the first creature
+    if (creatures.length > 0) {
+      vscode.postMessage({ type: 'nameCreature', creatureId: creatures[0].id, name });
+      selectedCreatureId = creatures[0].id;
+    }
+    wrapper.remove();
+  };
+
+  confirmBtn.addEventListener('click', commit);
+  input.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') commit(); });
+
+  wrapper.appendChild(label);
+  wrapper.appendChild(input);
+  wrapper.appendChild(confirmBtn);
+  toolbar.appendChild(wrapper);
+
+  // Auto-focus
+  setTimeout(() => input.focus(), 100);
 }
 
 // Restore saved language preference

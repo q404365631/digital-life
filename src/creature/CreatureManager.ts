@@ -135,21 +135,29 @@ export class CreatureManager {
     }
   }
 
-  commitBonus(): void {
+  /** Returns IDs of creatures that leveled up */
+  commitBonus(): string[] {
+    const leveled: string[] = [];
     for (const [id, creature] of this.creatures) {
-      // Scaling bonus: higher level creatures gain more from commits
+      const prevLevel = creature.level;
       const bonus = 10 + creature.level * 2;
-      this.creatures.set(id, addExp(creature, bonus));
+      const updated = addExp(creature, bonus);
+      this.creatures.set(id, updated);
+      if (updated.level > prevLevel) { leveled.push(id); }
     }
+    return leveled;
   }
 
-  /** Award EXP when file health improves (bugs fixed, lines reduced) */
-  healBonus(sourceFile: string): void {
+  /** Award EXP when file health improves. Returns creature ID if leveled up. */
+  healBonus(sourceFile: string): string | null {
     const creatureId = this.fileToCreatureId.get(sourceFile);
-    if (!creatureId) { return; }
+    if (!creatureId) { return null; }
     const creature = this.creatures.get(creatureId);
-    if (!creature) { return; }
-    this.creatures.set(creatureId, addExp(creature, 20));
+    if (!creature) { return null; }
+    const prevLevel = creature.level;
+    const updated = addExp(creature, 20);
+    this.creatures.set(creatureId, updated);
+    return updated.level > prevLevel ? creatureId : null;
   }
 
   updateBugEffect(hasBugs: boolean): void {

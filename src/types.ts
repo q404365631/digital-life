@@ -123,7 +123,9 @@ export type ExtToWebMessage =
   | { readonly type: 'commitDetected' }
   | { readonly type: 'bugCountChanged'; readonly count: number }
   | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string }
-  | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string };
+  | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string }
+  | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
+  | { readonly type: 'levelUp'; readonly creatureId: string };
 
 export type WebToExtMessage =
   | { readonly type: 'ready' }
@@ -143,7 +145,8 @@ export type WebToExtMessage =
   | { readonly type: 'sitAgent'; readonly agentId: string; readonly sitting: boolean }
   | { readonly type: 'deleteAgent'; readonly agentId: string }
   | { readonly type: 'clearAllCreatures' }
-  | { readonly type: 'revealFile'; readonly creatureId: string };
+  | { readonly type: 'revealFile'; readonly creatureId: string }
+  | { readonly type: 'spawnFile'; readonly filePath: string; readonly name: string };
 
 // --- Agent ---
 
