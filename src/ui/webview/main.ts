@@ -480,18 +480,20 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 
   if (targetId) {
     selectedCreatureId = targetId;
+    soundEngine.playSelectCreature();
     // Reveal this creature's file in the editor
     vscode.postMessage({ type: 'revealFile', creatureId: targetId });
     return;
   }
 
-  // Check agents (click = select + stop + open terminal)
+  // Check agents (click = select + open terminal)
   for (const agent of agents) {
     const dx = agent.position.x - worldPos.x;
     const dy = agent.position.y - worldPos.y;
     if (Math.sqrt(dx * dx + dy * dy) < 32) {
       selectedAgentId = agent.id;
       renderer.setSelectedAgentId(agent.id);
+      soundEngine.playSelectAgent();
       vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
       vscode.postMessage({ type: 'clickAgent', agentId: agent.id });
       return;

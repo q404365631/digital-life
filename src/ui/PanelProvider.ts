@@ -144,6 +144,8 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       firstRun:   this.toBase64(path.join(soundsDir, '扉が開く2.mp3')),
       cancel:     this.toBase64(path.join(soundsDir, '8bitアラート3.mp3')),
       agentSpawn: this.toBase64(path.join(soundsDir, '扉が開く2.mp3')),
+      selectCreature: this.toBase64(path.join(soundsDir, 'ぴちょん単発.mp3')),
+      selectAgent:    this.toBase64(path.join(soundsDir, '選択9.mp3')),
     };
 
     return `<!DOCTYPE html>
