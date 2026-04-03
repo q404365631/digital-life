@@ -46,12 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
   if (savedState) {
     creatureManager.loadCreatures(savedState.creatures);
     worldState = savedState.world;
-    if (savedState.agents) {
-      // Filter out agents with invalid/removed types
-      const validTypes = new Set(['claude', 'cursor', 'copilot']);
-      const validAgents = savedState.agents.filter(a => validTypes.has(a.agentType));
-      agentManager.loadAgents(validAgents);
-    }
+    // Don't restore saved agents - start fresh each session
   } else {
     worldState = createInitialWorldState();
   }
