@@ -501,9 +501,14 @@ export function activate(context: vscode.ExtensionContext): void {
         const agent = agentManager.getById(message.agentId);
         if (agent) {
           const terminal = getAgentTerminal(agent.id, agent.name, agent.agentType);
-          terminal.show(false); // false = take focus, switch terminal
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
+          // Delay terminal focus — webview holds focus during message handling,
+          // so we must yield before VS Code can switch terminal focus
+          setTimeout(() => {
+            terminal.show(false);
+            void vscode.commands.executeCommand('workbench.action.terminal.focus');
+          }, 100);
         }
         return true;
       }
