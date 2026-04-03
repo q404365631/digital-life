@@ -20,6 +20,13 @@ export class SpriteRenderer {
   private imageCache: Map<string, HTMLImageElement> = new Map();
   private loadedImages: Map<string, boolean> = new Map();
 
+  // Healed creature IDs (set by GameRenderer for speech bubble override)
+  private healedIds: Set<string> = new Set();
+
+  setHealedIds(ids: Set<string>): void {
+    this.healedIds = ids;
+  }
+
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.preloadSprites();
   }
@@ -336,6 +343,9 @@ export class SpriteRenderer {
   }
 
   private getCreatureMood(creature: CreatureData): string | null {
+    // Recently healed — override with recovery message
+    if (this.healedIds.has(creature.id)) return t('bubble_healed');
+
     const h = creature.fileHealth;
     const stale = (Date.now() - h.lastModified) / 864e5;
 

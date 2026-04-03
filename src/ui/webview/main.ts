@@ -308,6 +308,11 @@ const eduMessage = document.getElementById('edu-message');
 // AI Action preview state
 let pendingAiAction: { creatureId: string; action: string; description: string } | null = null;
 
+// ── Guide flow ───────────────────────────────────────────────
+// A gentle first-time tutorial: Feed → Care, taught through experience
+type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
+let guidePhase: GuidePhase = 'none';
+
 // Message handling
 window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
   const message = event.data;
@@ -336,6 +341,8 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'creatureDied': {
       soundEngine.playDeath();
+      // Farewell scene — a moment of quiet respect
+      renderer.triggerFarewell(t('farewell', { name: message.creatureName }));
       if (selectedCreatureId === message.creatureId) {
         const alive = creatures.filter(c => c.id !== message.creatureId);
         selectedCreatureId = alive.length > 0 ? alive[0].id : null;
@@ -354,6 +361,16 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       if (lvCreature) {
         renderer.triggerFeedEffect(lvCreature.position.x, lvCreature.position.y);
         soundEngine.playHatch();
+      }
+      break;
+    }
+
+    case 'creatureHealed': {
+      // Recovery effect — creature-specific green sparkles + healing bubble
+      const healedCreature = creatures.find(c => c.id === message.creatureId);
+      if (healedCreature) {
+        renderer.triggerHealEffect(healedCreature.position.x, healedCreature.position.y, message.creatureId);
+        soundEngine.playPet();
       }
       break;
     }
@@ -596,6 +613,11 @@ function handleAction(mode: ActionMode, creature: CreatureData): void {
       soundEngine.playFeed();
       renderer.triggerFeedEffect(creature.position.x, creature.position.y);
       showEduMessage(t('feed_msg'));
+
+      // Guide: feeding completed — celebrate and hint at Care
+      if (guidePhase === 'waitFeed') {
+        advanceGuide('waitCare');
+      }
       break;
 
     case 'care':
@@ -603,6 +625,11 @@ function handleAction(mode: ActionMode, creature: CreatureData): void {
       vscode.postMessage({ type: 'care', targetId: creature.id });
       soundEngine.playPet();
       showEduMessage(t('care_diagnosing'));
+
+      // Guide: care completed — tutorial done
+      if (guidePhase === 'waitCare') {
+        advanceGuide('done');
+      }
       break;
   }
 
@@ -671,6 +698,43 @@ function hideAiApproval(): void {
   cancelBtn?.classList.add('hidden');
 }
 
+// ── Guide flow state machine ───────────────────────────────
+// Teaches Feed and Care through a natural first experience.
+
+function startGuide(): void {
+  guidePhase = 'waitFeed';
+  showEduMessage(t('guide_feed'));
+  btnFeed?.classList.add('guide-pulse');
+}
+
+function advanceGuide(to: GuidePhase): void {
+  // Clean up previous phase
+  btnFeed?.classList.remove('guide-pulse');
+  btnCare?.classList.remove('guide-pulse');
+
+  guidePhase = to;
+
+  if (to === 'waitCare') {
+    showEduMessage(t('guide_fed'));
+    // After a beat, hint at Care
+    setTimeout(() => {
+      if (guidePhase !== 'waitCare') return;
+      showEduMessage(t('guide_care'));
+      btnCare?.classList.add('guide-pulse');
+      // Auto-complete guide after a few seconds (don't force the user)
+      setTimeout(() => {
+        if (guidePhase === 'waitCare') {
+          advanceGuide('done');
+        }
+      }, 6000);
+    }, 3000);
+  } else if (to === 'done') {
+    btnCare?.classList.remove('guide-pulse');
+    hideEduMessage();
+    guidePhase = 'done';
+  }
+}
+
 // ── First-run ceremony ─────────────────────────────────────
 // Files already exist in the workspace. They ARE the creatures.
 // The first file (most recently edited) gets a special introduction.
@@ -735,6 +799,8 @@ function showNamingPrompt(defaultName: string): void {
       selectedCreatureId = creatures[0].id;
     }
     wrapper.remove();
+    // Begin the gentle tutorial — creature is already hungry
+    setTimeout(() => startGuide(), 1500);
   };
 
   confirmBtn.addEventListener('click', commit);

@@ -102,6 +102,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Spawn suppression flag — prevents existing files from spawning creatures on startup/reset
   let spawnEnabled = true;
 
+  // First-run guide: make the very first creature hungry so the tutorial works
+  let firstRunCreatureCount = 0;
+
   // Monitor manager
   const monitorManager = new MonitorManager(workspacePath, {
     onFileCreated: (filePath: string) => {
@@ -147,7 +150,7 @@ export function activate(context: vscode.ExtensionContext): void {
           creature.sourceFile,
           creature.position,
         );
-        panelProvider.postMessage({ type: 'creatureDied', creatureId: creature.id });
+        panelProvider.postMessage({ type: 'creatureDied', creatureId: creature.id, creatureName: creature.name });
         sendWorldUpdate();
         saveState();
       }
@@ -175,8 +178,16 @@ export function activate(context: vscode.ExtensionContext): void {
     onFileHealthChanged: (filePath: string, health: FileHealth) => {
       const result = creatureManager.updateFileHealth(filePath, health);
       if (result?.improved) {
-        // File got healthier! Trigger celebration effect
-        panelProvider.postMessage({ type: 'commitDetected' }); // reuse sparkle effect
+        // File got healthier! Trigger creature-specific recovery effect
+        const healedId = creatureManager.getByFile(filePath);
+        const healedCreature = healedId ? creatureManager.getById(healedId) : undefined;
+        if (healedCreature) {
+          panelProvider.postMessage({
+            type: 'creatureHealed',
+            creatureId: healedCreature.id,
+            creatureName: healedCreature.name,
+          });
+        }
         updateStatusBar();
       }
       sendWorldUpdate();
@@ -335,6 +346,11 @@ export function activate(context: vscode.ExtensionContext): void {
           const species = getSpeciesForFile(message.filePath);
           const creature = creatureManager.spawnCreature(message.filePath, message.name, species, currentDNA);
           if (creature) {
+            // First creature in first-run ceremony: make them hungry for the tutorial
+            if (isFirstRun && firstRunCreatureCount === 0) {
+              creatureManager.setHunger(creature.id, 15);
+            }
+            firstRunCreatureCount++;
             panelProvider.postMessage({ type: 'creatureBorn', creature });
             saveState();
             sendWorldUpdate();

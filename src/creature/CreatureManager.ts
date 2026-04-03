@@ -57,6 +57,10 @@ export class CreatureManager {
     return this.fileToCreatureId.has(filePath);
   }
 
+  getByFile(filePath: string): string | undefined {
+    return this.fileToCreatureId.get(filePath);
+  }
+
   removeCreature(sourceFile: string): CreatureData | null {
     const creatureId = this.fileToCreatureId.get(sourceFile);
     if (!creatureId) {
@@ -67,6 +71,13 @@ export class CreatureManager {
     this.creatures.delete(creatureId);
     this.fileToCreatureId.delete(sourceFile);
     return creature ?? null;
+  }
+
+  setHunger(creatureId: string, hunger: number): void {
+    const creature = this.creatures.get(creatureId);
+    if (creature) {
+      this.creatures.set(creatureId, { ...creature, hunger });
+    }
   }
 
   renameCreature(creatureId: string, name: string): void {

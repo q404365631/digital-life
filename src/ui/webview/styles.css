@@ -201,3 +201,21 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* Guide tutorial: soft glow on the button the user should try */
+.tool-btn.guide-pulse {
+  animation: guidePulse 1.5s ease-in-out infinite;
+  border-color: #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+@keyframes guidePulse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(255, 215, 0, 0.3);
+    border-color: #ffd700;
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(255, 215, 0, 0.6);
+    border-color: #ffe44d;
+  }
+}

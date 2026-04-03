@@ -119,11 +119,12 @@ export interface MonitorState {
 export type ExtToWebMessage =
   | { readonly type: 'worldUpdate'; readonly creatures: readonly CreatureData[]; readonly world: WorldData; readonly bugs: number; readonly agents: readonly AgentData[] }
   | { readonly type: 'creatureBorn'; readonly creature: CreatureData }
-  | { readonly type: 'creatureDied'; readonly creatureId: string }
+  | { readonly type: 'creatureDied'; readonly creatureId: string; readonly creatureName: string }
   | { readonly type: 'commitDetected' }
   | { readonly type: 'bugCountChanged'; readonly count: number }
   | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string }
   | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string }
+  | { readonly type: 'creatureHealed'; readonly creatureId: string; readonly creatureName: string }
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
   | { readonly type: 'levelUp'; readonly creatureId: string };
 

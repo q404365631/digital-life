@@ -15,6 +15,18 @@ export class GameRenderer {
   // Feed drop animation
   private feedEffects: { x: number; y: number; startTime: number }[] = [];
 
+  // Heal recovery effect (green sparkles per creature)
+  private healEffects: { x: number; y: number; startTime: number }[] = [];
+  private readonly HEAL_EFFECT_DURATION = 2000;
+
+  // Healed creature IDs — SpriteRenderer uses this to override speech bubble
+  private healedCreatureIds: Map<string, number> = new Map(); // id → timestamp
+
+  // Farewell scene (file deletion)
+  private farewellName: string | null = null;
+  private farewellStart: number = 0;
+  private readonly FAREWELL_DURATION = 3000;
+
   // Selected agent for keyboard control
   private selectedAgentId: string | null = null;
 
@@ -39,6 +51,29 @@ export class GameRenderer {
 
   triggerFeedEffect(worldX: number, worldY: number): void {
     this.feedEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
+  }
+
+  triggerHealEffect(worldX: number, worldY: number, creatureId?: string): void {
+    this.healEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
+    if (creatureId) {
+      this.healedCreatureIds.set(creatureId, Date.now());
+    }
+  }
+
+  /** Check if a creature recently healed (for speech bubble override) */
+  isRecentlyHealed(creatureId: string): boolean {
+    const ts = this.healedCreatureIds.get(creatureId);
+    if (!ts) return false;
+    if (Date.now() - ts > 4000) {
+      this.healedCreatureIds.delete(creatureId);
+      return false;
+    }
+    return true;
+  }
+
+  triggerFarewell(name: string): void {
+    this.farewellName = name;
+    this.farewellStart = Date.now();
   }
 
   render(
@@ -73,6 +108,14 @@ export class GameRenderer {
     for (const grave of world.graveStones) {
       this.spriteRenderer.renderGraveStone(grave);
     }
+
+    // Pass healed state to sprite renderer for speech bubble override
+    const activeHealed = new Set<string>();
+    for (const [id, ts] of this.healedCreatureIds) {
+      if (Date.now() - ts < 4000) { activeHealed.add(id); }
+      else { this.healedCreatureIds.delete(id); }
+    }
+    this.spriteRenderer.setHealedIds(activeHealed);
 
     // Draw creatures
     for (const creature of creatures) {
@@ -110,6 +153,9 @@ export class GameRenderer {
     // Draw feed drop effects
     this.renderFeedEffects();
 
+    // Draw heal recovery effects
+    this.renderHealEffects();
+
     // Draw interaction hearts between nearby creatures
     this.renderInteractionHearts(creatures);
 
@@ -137,6 +183,9 @@ export class GameRenderer {
     if (this.commitEffectProgress > 0) {
       this.uiRenderer.renderCommitEffect(this.commitEffectProgress);
     }
+
+    // Farewell overlay (UI layer — screen dims, name floats away)
+    this.renderFarewell();
   }
 
   private renderChatBubble(x: number, y: number, message: string): void {
@@ -293,6 +342,112 @@ export class GameRenderer {
 
       this.ctx.restore();
     }
+  }
+
+  private renderHealEffects(): void {
+    const now = Date.now();
+    this.healEffects = this.healEffects.filter(e => now - e.startTime < this.HEAL_EFFECT_DURATION);
+
+    for (const effect of this.healEffects) {
+      const elapsed = now - effect.startTime;
+      const progress = elapsed / this.HEAL_EFFECT_DURATION;
+
+      this.ctx.save();
+
+      // Phase 1: Green ring expands outward (0-0.4)
+      if (progress < 0.4) {
+        const ringProgress = progress / 0.4;
+        const radius = 8 + ringProgress * 20;
+        this.ctx.globalAlpha = 1 - ringProgress * 0.5;
+        this.ctx.strokeStyle = '#66BB6A';
+        this.ctx.lineWidth = 2 - ringProgress;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+
+      // Phase 2: Leaf-green sparkles float upward (0.1-0.9)
+      if (progress > 0.1 && progress < 0.9) {
+        const sparkleAlpha = progress < 0.3 ? (progress - 0.1) / 0.2 : (0.9 - progress) / 0.6;
+        this.ctx.globalAlpha = sparkleAlpha * 0.8;
+        this.ctx.fillStyle = '#A5D6A7';
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2 + elapsed * 0.003;
+          const r = 10 + progress * 18;
+          const rise = progress * 12;
+          const px = effect.x + Math.cos(angle) * r;
+          const py = effect.y - rise + Math.sin(angle) * r * 0.5;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 1.5 - progress * 0.8, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      }
+
+      // Phase 3: Soft glow dissipates (0.5-1.0)
+      if (progress > 0.5) {
+        const glowAlpha = (1 - progress) * 0.3;
+        this.ctx.globalAlpha = glowAlpha;
+        const gradient = this.ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, 24);
+        gradient.addColorStop(0, '#C8E6C9');
+        gradient.addColorStop(1, 'transparent');
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, 24, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      this.ctx.restore();
+    }
+  }
+
+  private renderFarewell(): void {
+    if (!this.farewellName) return;
+    const elapsed = Date.now() - this.farewellStart;
+    if (elapsed > this.FAREWELL_DURATION) {
+      this.farewellName = null;
+      return;
+    }
+
+    const progress = elapsed / this.FAREWELL_DURATION;
+
+    this.ctx.save();
+
+    // Dim overlay — peaks at 0.3, then fades
+    const dimAlpha = progress < 0.2 ? progress / 0.2 * 0.4 :
+                     progress < 0.6 ? 0.4 :
+                     0.4 * (1 - (progress - 0.6) / 0.4);
+    this.ctx.fillStyle = `rgba(10, 10, 30, ${dimAlpha})`;
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Name floats upward from center and fades
+    const textAlpha = progress < 0.15 ? progress / 0.15 :
+                      progress > 0.7 ? (1 - progress) / 0.3 : 1;
+    const floatY = CANVAS_HEIGHT / 2 - progress * 30;
+
+    this.ctx.globalAlpha = textAlpha;
+    this.ctx.textAlign = 'center';
+
+    // Name
+    this.ctx.font = 'bold 14px sans-serif';
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.fillText(this.farewellName, CANVAS_WIDTH / 2, floatY);
+
+    // Subtle dotted line below (like a gentle wave goodbye)
+    if (progress > 0.2 && progress < 0.8) {
+      const lineAlpha = textAlpha * 0.4;
+      this.ctx.globalAlpha = lineAlpha;
+      this.ctx.strokeStyle = '#FFFFFF';
+      this.ctx.lineWidth = 0.5;
+      this.ctx.setLineDash([2, 4]);
+      this.ctx.beginPath();
+      const lineW = 40;
+      this.ctx.moveTo(CANVAS_WIDTH / 2 - lineW, floatY + 8);
+      this.ctx.lineTo(CANVAS_WIDTH / 2 + lineW, floatY + 8);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+    }
+
+    this.ctx.restore();
   }
 
   private updateCommitEffect(): void {
