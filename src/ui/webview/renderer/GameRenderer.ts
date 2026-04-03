@@ -4,6 +4,22 @@ import { SpriteRenderer } from './SpriteRenderer';
 import { UIRenderer } from './UIRenderer';
 import { t } from '../i18n';
 
+/** All data needed to render a single frame — "12 params is a code smell" (TJ) */
+export interface RenderContext {
+  creatures: readonly CreatureData[];
+  world: WorldData;
+  bugCount: number;
+  zoom: number;
+  panX: number;
+  panY: number;
+  selectedCreatureId: string | null;
+  draggingCreatureId: string | null;
+  agents: readonly AgentData[];
+  agentChats: Map<string, { message: string; timestamp: number }>;
+  eventSpeechOverrides: Map<string, { text: string; timestamp: number }>;
+  friendPairs: readonly { a: string; b: string }[];
+}
+
 export class GameRenderer {
   private readonly spriteRenderer: SpriteRenderer;
   private readonly uiRenderer: UIRenderer;
@@ -76,20 +92,13 @@ export class GameRenderer {
     this.farewellStart = Date.now();
   }
 
-  render(
-    creatures: readonly CreatureData[],
-    world: WorldData,
-    bugCount: number,
-    zoom: number = 1.0,
-    panOffsetX: number = 0,
-    panOffsetY: number = 0,
-    selectedCreatureId: string | null = null,
-    draggingCreatureId: string | null = null,
-    agents: readonly AgentData[] = [],
-    agentChats: Map<string, { message: string; timestamp: number }> = new Map(),
-    eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = new Map(),
-    friendPairs: readonly { a: string; b: string }[] = [],
-  ): void {
+  render(rc: RenderContext): void {
+    const {
+      creatures, world, bugCount, zoom, panX: panOffsetX, panY: panOffsetY,
+      selectedCreatureId, draggingCreatureId, agents, agentChats,
+      eventSpeechOverrides, friendPairs,
+    } = rc;
+
     // Clear entire canvas (before any transform)
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 

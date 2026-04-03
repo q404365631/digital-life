@@ -419,6 +419,11 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       bugCount = message.count;
       break;
 
+    case 'agentAdded': {
+      soundEngine.playAgentSpawn();
+      break;
+    }
+
     case 'agentChat': {
       agentChats.set(message.agentId, { message: message.message, timestamp: Date.now() });
       break;
@@ -488,7 +493,6 @@ canvas.addEventListener('click', (event: MouseEvent) => {
       selectedAgentId = agent.id;
       renderer.setSelectedAgentId(agent.id);
       vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
-      vscode.postMessage({ type: 'stopAgent', agentId: agent.id });
       vscode.postMessage({ type: 'clickAgent', agentId: agent.id });
       return;
     }
@@ -605,7 +609,8 @@ function setActionMode(mode: ActionMode): void {
   // Reset active class on all buttons
   btnFeed?.classList.toggle('active', mode === 'feed');
   btnCare?.classList.toggle('active', mode === 'care');
-  canvas.classList.toggle('feed-mode', mode !== 'none');
+  canvas.classList.toggle('feed-mode', mode === 'feed');
+  canvas.classList.toggle('care-mode', mode === 'care');
 
   if (feedIndicator) {
     feedIndicator.classList.toggle('hidden', mode === 'none');
@@ -928,7 +933,12 @@ function gameLoop(timestamp: number): void {
         return { ...a, position: smoothed };
       });
 
-      renderer.render(smoothCreatures, worldData, bugCount, zoomLevel, panX, panY, selectedCreatureId, draggingCreatureId, smoothAgents, agentChats, eventSpeechOverrides, friendshipPairs);
+      renderer.render({
+        creatures: smoothCreatures, world: worldData, bugCount,
+        zoom: zoomLevel, panX, panY,
+        selectedCreatureId, draggingCreatureId,
+        agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs,
+      });
     }
   }
 

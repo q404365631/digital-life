@@ -7,7 +7,7 @@ import { CreatureStorage } from './storage/CreatureStorage';
 import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone } from './world/WorldState';
 import { getSpeciesForFile } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
-import { WorldData, ExtToWebMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
+import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
 import { MAX_CREATURES } from './constants';
 import { AgentManager } from './agent/AgentManager';
 import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
@@ -367,18 +367,13 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   // Handle messages from webview
-  panelProvider.onMessage((message) => {
+  // ── Message handlers — grouped by domain ────────────────────
+  //
+  // "20 cases in one switch is a code smell." — TJ Holowaychuk
+  // Three groups: creatures, agents, lifecycle.
+
+  function handleCreatureMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
-      case 'ready':
-        sendWorldUpdate();
-        // Feature C: morning diary on session start
-        if (!isFirstRun) {
-          setTimeout(() => sendMorningDiary(), 2000);
-          broadcastSpeech('morning');
-        }
-        // Feature D: initial friendship scan
-        setTimeout(() => updateFriendships(), 3000);
-        break;
       case 'action':
         if (message.action === 'feed') {
           creatureManager.feed(message.targetId);
@@ -387,9 +382,8 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         sendWorldUpdate();
         saveState();
-        break;
+        return true;
       case 'care': {
-        // AI auto-diagnoses the best action for this creature
         const careCreature = creatureManager.getById(message.targetId);
         if (careCreature) {
           const health = careCreature.fileHealth;
@@ -410,8 +404,6 @@ export function activate(context: vscode.ExtensionContext): void {
             action = 'feed';
             description = 'コードを最適化して可読性を向上させます';
           }
-
-          // Send preview to Webview for user approval
           panelProvider.postMessage({
             type: 'aiActionPreview',
             creatureId: careCreature.id,
@@ -419,10 +411,9 @@ export function activate(context: vscode.ExtensionContext): void {
             description,
           });
         }
-        break;
+        return true;
       }
       case 'approveAiAction': {
-        // User approved the AI action — now execute
         const approvedCreature = creatureManager.getById(message.creatureId);
         if (approvedCreature) {
           const aiTerminal = findOrCreateClaudeTerminal();
@@ -436,10 +427,9 @@ export function activate(context: vscode.ExtensionContext): void {
           sendWorldUpdate();
           saveState();
         }
-        break;
+        return true;
       }
       case 'heal': {
-        // Legacy direct heal (kept for backward compat but now prefer care → approve flow)
         const healCreature = creatureManager.getById(message.targetId);
         if (healCreature) {
           const aiTerminal = findOrCreateClaudeTerminal();
@@ -453,18 +443,38 @@ export function activate(context: vscode.ExtensionContext): void {
         creatureManager.feed(message.targetId);
         sendWorldUpdate();
         saveState();
-        break;
+        return true;
       }
       case 'nameCreature':
         creatureManager.renameCreature(message.creatureId, message.name);
         sendWorldUpdate();
         saveState();
-        break;
+        return true;
       case 'moveCreature':
         creatureManager.moveCreature(message.creatureId, message.position);
         sendWorldUpdate();
         saveState();
-        break;
+        return true;
+      case 'revealFile': {
+        const revealCreature = creatureManager.getById(message.creatureId);
+        if (revealCreature) {
+          const uri = vscode.Uri.file(revealCreature.sourceFile);
+          void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+        }
+        return true;
+      }
+      case 'clearAllCreatures':
+        creatureManager.loadCreatures([]);
+        sendWorldUpdate();
+        saveState();
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function handleAgentMessage(message: WebToExtMessage): boolean {
+    switch (message.type) {
       case 'addAgent': {
         void (async () => {
           const pick = await vscode.window.showQuickPick([
@@ -487,10 +497,11 @@ export function activate(context: vscode.ExtensionContext): void {
             terminal.sendText(cmd);
           }
           agentManager.updateStatus(agent.id, 'running');
+          panelProvider.postMessage({ type: 'agentAdded', agentId: agent.id });
           sendWorldUpdate();
           saveState();
         })();
-        break;
+        return true;
       }
       case 'clickAgent': {
         const agent = agentManager.getById(message.agentId);
@@ -510,21 +521,58 @@ export function activate(context: vscode.ExtensionContext): void {
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
         }
-        break;
+        return true;
       }
-      case 'deleteAgent': {
+      case 'deleteAgent':
         agentManager.removeAgent(message.agentId);
         sendWorldUpdate();
         saveState();
-        break;
-      }
+        return true;
+      case 'stopAgent':
+        agentManager.stopAgent(message.agentId);
+        sendWorldUpdate();
+        return true;
+      case 'moveAgent':
+        agentManager.moveAgent(message.agentId, message.position);
+        saveState();
+        return true;
+      case 'moveAgentByKey':
+        agentManager.moveByKey(message.agentId, message.dx, message.dy);
+        sendWorldUpdate();
+        return true;
+      case 'selectAgent':
+        agentManager.selectAgent(message.agentId);
+        sendWorldUpdate();
+        return true;
+      case 'sitAgent':
+        agentManager.toggleSit(message.agentId);
+        sendWorldUpdate();
+        saveState();
+        return true;
+      case 'chatAgent':
+        // eslint-disable-next-line no-console -- placeholder
+        console.debug(`[Digital Life] chatAgent: ${message.agentId}`);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  function handleLifecycleMessage(message: WebToExtMessage): boolean {
+    switch (message.type) {
+      case 'ready':
+        sendWorldUpdate();
+        if (!isFirstRun) {
+          setTimeout(() => sendMorningDiary(), 2000);
+          broadcastSpeech('morning');
+        }
+        setTimeout(() => updateFriendships(), 3000);
+        return true;
       case 'spawnFile': {
-        // Webview asks to spawn a specific file as a creature (used during first-run ceremony)
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
           const species = getSpeciesForFile(message.filePath);
           const creature = creatureManager.spawnCreature(message.filePath, message.name, species, currentDNA);
           if (creature) {
-            // First creature in first-run ceremony: make them hungry for the tutorial
             if (isFirstRun && firstRunCreatureCount === 0) {
               creatureManager.setHunger(creature.id, 15);
             }
@@ -534,55 +582,17 @@ export function activate(context: vscode.ExtensionContext): void {
             sendWorldUpdate();
           }
         }
-        break;
+        return true;
       }
-      case 'revealFile': {
-        const revealCreature = creatureManager.getById(message.creatureId);
-        if (revealCreature) {
-          const uri = vscode.Uri.file(revealCreature.sourceFile);
-          void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
-        }
-        break;
-      }
-      case 'clearAllCreatures': {
-        creatureManager.loadCreatures([]);
-        sendWorldUpdate();
-        saveState();
-        break;
-      }
-      case 'stopAgent': {
-        agentManager.stopAgent(message.agentId);
-        sendWorldUpdate();
-        break;
-      }
-      case 'moveAgent': {
-        agentManager.moveAgent(message.agentId, message.position);
-        saveState();
-        break;
-      }
-      case 'moveAgentByKey': {
-        agentManager.moveByKey(message.agentId, message.dx, message.dy);
-        sendWorldUpdate();
-        break;
-      }
-      case 'selectAgent': {
-        agentManager.selectAgent(message.agentId);
-        sendWorldUpdate();
-        break;
-      }
-      case 'sitAgent': {
-        agentManager.toggleSit(message.agentId);
-        sendWorldUpdate();
-        saveState();
-        break;
-      }
-      case 'chatAgent': {
-        // TODO: Implement agent chat feature
-        // eslint-disable-next-line no-console -- placeholder until agent chat logging is implemented
-        console.debug(`[Digital Life] chatAgent message received for agent ${message.agentId}: ${message.message}`);
-        break;
-      }
+      default:
+        return false;
     }
+  }
+
+  panelProvider.onMessage((message) => {
+    handleCreatureMessage(message)
+      || handleAgentMessage(message)
+      || handleLifecycleMessage(message);
   });
 
   // Terminal close handler for agents

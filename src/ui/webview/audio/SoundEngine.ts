@@ -146,4 +146,5 @@ export class SoundEngine {
   playFriendship(): void   { this.play('friendship', 0.25); }
   playFirstRun(): void     { this.play('firstRun', 0.45); }
   playCancel(): void       { this.play('cancel', 0.35); }
+  playAgentSpawn(): void   { this.play('agentSpawn', 0.5); }
 }

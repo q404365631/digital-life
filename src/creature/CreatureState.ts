@@ -1,5 +1,6 @@
 import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType, Species, CodingDNA } from '../types';
 import { defaultDNA } from './DNAAnalyzer';
+import { getPersonality, Personality } from '../ai/SpeechTemplates';
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, SPRITE_SIZE,
   HUNGER_DECAY_RATE, HAPPINESS_DECAY_RATE,
@@ -193,12 +194,56 @@ export function updateReactionTimer(creature: CreatureData, deltaMs: number): Cr
   };
 }
 
+/**
+ * Personality-driven movement — "見ているだけで性格がわかる" (Bret Victor)
+ *
+ *   active  → fast, restless, short idles, long strides
+ *   calm    → slow, stays nearby, long pauses
+ *   curious → darts across the map, frequent direction changes
+ *   shy     → hugs edges, small steps, rarely moves
+ */
+
+const PERSONALITY_SPEED: Record<Personality, number> = {
+  active: 1.4,  calm: 0.7,  curious: 1.0,  shy: 0.6,
+};
+const PERSONALITY_MOVE_CHANCE: Record<Personality, number> = {
+  active: 0.018,  calm: 0.006,  curious: 0.014,  shy: 0.004,
+};
+const PERSONALITY_RANGE: Record<Personality, number> = {
+  active: 0.8,  calm: 0.3,  curious: 1.0,  shy: 0.25,
+};
+
+function personalityTarget(personality: Personality, from: Position): Position {
+  const margin = SPRITE_SIZE * 2;
+  const range = PERSONALITY_RANGE[personality];
+  const w = (CANVAS_WIDTH - margin * 2) * range;
+  const h = (CANVAS_HEIGHT - margin * 2) * range;
+
+  if (personality === 'shy') {
+    // Prefer edges — pick a random edge and place target near it
+    const edge = Math.floor(Math.random() * 4);
+    switch (edge) {
+      case 0: return { x: margin + Math.random() * 40, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
+      case 1: return { x: CANVAS_WIDTH - margin - Math.random() * 40, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
+      case 2: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: margin + Math.random() * 40 };
+      default: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: CANVAS_HEIGHT - margin - Math.random() * 40 };
+    }
+  }
+
+  // Other personalities: range-limited offset from current position
+  const cx = from.x + (Math.random() - 0.5) * w;
+  const cy = from.y + (Math.random() - 0.5) * h;
+  return {
+    x: Math.max(margin, Math.min(CANVAS_WIDTH - margin, cx)),
+    y: Math.max(margin, Math.min(CANVAS_HEIGHT - margin, cy)),
+  };
+}
+
 export function updateCreatureMovement(creature: CreatureData): CreatureData {
   if (creature.stage === 'egg') {
     return creature;
   }
 
-  // Don't move during reactions
   if (creature.reactionTimer > 0) {
     return creature;
   }
@@ -207,19 +252,17 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
     return creature;
   }
 
-  // DNA-based speed multiplier: 0.5x ~ 1.5x
-  const speedMultiplier = 0.5 + creature.dna.velocity;
+  const personality = getPersonality(creature.dna);
+
+  // Personality + DNA velocity combined for final speed
+  const speedMultiplier = PERSONALITY_SPEED[personality] * (0.7 + creature.dna.velocity * 0.6);
   const speed = CREATURE_SPEED * speedMultiplier;
 
   if (!creature.targetPosition) {
-    // DNA consistency affects idle→walk transition probability
-    // High consistency = regular timing (base 0.01), low consistency = wider random range
-    const baseChance = 0.01;
-    const randomRange = (1 - creature.dna.consistency) * 0.02;
-    const moveChance = baseChance + (Math.random() - 0.5) * randomRange;
+    const moveChance = PERSONALITY_MOVE_CHANCE[personality];
 
     if (Math.random() < moveChance) {
-      const target = randomTarget();
+      const target = personalityTarget(personality, creature.position);
       const dx = target.x - creature.position.x;
       const dy = target.y - creature.position.y;
       const walkState = getWalkDirection(dx, dy);

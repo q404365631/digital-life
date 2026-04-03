@@ -130,7 +130,8 @@ export type ExtToWebMessage =
   | { readonly type: 'friendships'; readonly pairs: readonly { a: string; b: string }[] }
   | { readonly type: 'diary'; readonly creatureId: string; readonly entry: string }
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
-  | { readonly type: 'levelUp'; readonly creatureId: string };
+  | { readonly type: 'levelUp'; readonly creatureId: string }
+  | { readonly type: 'agentAdded'; readonly agentId: string };
 
 export type WebToExtMessage =
   | { readonly type: 'ready' }
