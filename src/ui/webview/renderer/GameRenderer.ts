@@ -87,6 +87,8 @@ export class GameRenderer {
     draggingCreatureId: string | null = null,
     agents: readonly AgentData[] = [],
     agentChats: Map<string, { message: string; timestamp: number }> = new Map(),
+    eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = new Map(),
+    friendPairs: readonly { a: string; b: string }[] = [],
   ): void {
     // Clear entire canvas (before any transform)
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -109,13 +111,21 @@ export class GameRenderer {
       this.spriteRenderer.renderGraveStone(grave);
     }
 
-    // Pass healed state to sprite renderer for speech bubble override
+    // Pass healed state + event speech to sprite renderer for bubble overrides
     const activeHealed = new Set<string>();
     for (const [id, ts] of this.healedCreatureIds) {
       if (Date.now() - ts < 4000) { activeHealed.add(id); }
       else { this.healedCreatureIds.delete(id); }
     }
     this.spriteRenderer.setHealedIds(activeHealed);
+
+    // Event speech overrides (Feature A): active for 6 seconds
+    const activeSpeech = new Map<string, string>();
+    for (const [id, { text, timestamp }] of eventSpeechOverrides) {
+      if (Date.now() - timestamp < 6000) { activeSpeech.set(id, text); }
+      else { eventSpeechOverrides.delete(id); }
+    }
+    this.spriteRenderer.setEventSpeech(activeSpeech);
 
     // Draw creatures
     for (const creature of creatures) {
@@ -158,6 +168,9 @@ export class GameRenderer {
 
     // Draw interaction hearts between nearby creatures
     this.renderInteractionHearts(creatures);
+
+    // Draw friendship indicators (Feature D: import-based relationships)
+    this.renderFriendshipLinks(creatures, friendPairs);
 
     // Draw weather overlay (part of the world)
     this.uiRenderer.renderWeatherOverlay(world.weather);
@@ -257,6 +270,45 @@ export class GameRenderer {
         }
       }
     }
+  }
+
+  /** Feature D: Draw subtle dotted lines between creatures that share import dependencies */
+  private renderFriendshipLinks(
+    creatures: readonly CreatureData[],
+    pairs: readonly { a: string; b: string }[],
+  ): void {
+    if (pairs.length === 0) return;
+    const lookup = new Map(creatures.map(c => [c.id, c]));
+
+    this.ctx.save();
+    this.ctx.strokeStyle = 'rgba(255, 182, 193, 0.3)'; // soft pink
+    this.ctx.lineWidth = 0.5;
+    this.ctx.setLineDash([2, 4]);
+
+    for (const { a, b } of pairs) {
+      const ca = lookup.get(a);
+      const cb = lookup.get(b);
+      if (!ca || !cb || ca.stage === 'egg' || cb.stage === 'egg') continue;
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(ca.position.x, ca.position.y);
+      this.ctx.lineTo(cb.position.x, cb.position.y);
+      this.ctx.stroke();
+
+      // Tiny star at midpoint
+      const mx = (ca.position.x + cb.position.x) / 2;
+      const my = (ca.position.y + cb.position.y) / 2;
+      const pulse = 0.4 + Math.sin(Date.now() / 500) * 0.3;
+      this.ctx.globalAlpha = pulse;
+      this.ctx.fillStyle = '#FFB6C1';
+      this.ctx.beginPath();
+      this.ctx.arc(mx, my, 2, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 1;
+    }
+
+    this.ctx.setLineDash([]);
+    this.ctx.restore();
   }
 
   private readonly FEED_EFFECT_DURATION = 1200;

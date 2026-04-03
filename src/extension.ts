@@ -10,6 +10,8 @@ import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
 import { MAX_CREATURES } from './constants';
 import { AgentManager } from './agent/AgentManager';
+import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
+import { analyzeFriendships } from './monitor/ImportAnalyzer';
 
 const TICK_INTERVAL = 200; // ms
 
@@ -105,6 +107,167 @@ export function activate(context: vscode.ExtensionContext): void {
   // First-run guide: make the very first creature hungry so the tutorial works
   let firstRunCreatureCount = 0;
 
+  // ── Feature A: Living words — event-driven creature speech ──
+  // Detects language from VS Code locale (simplified: ja or en)
+  const speechLang = vscode.env.language.startsWith('ja') ? 'ja' : 'en';
+
+  /** Broadcast event-driven speech to a random subset of creatures */
+  function broadcastSpeech(event: SpeechEvent, specificCreatureId?: string): void {
+    const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
+    if (all.length === 0) return;
+
+    if (specificCreatureId) {
+      // Targeted speech to one creature
+      const creature = creatureManager.getById(specificCreatureId);
+      if (creature) {
+        const personality = getPersonality(creature.dna);
+        const text = pickSpeech(event, personality, speechLang);
+        if (text) {
+          panelProvider.postMessage({ type: 'creatureSpeech', creatureId: creature.id, text });
+        }
+      }
+      return;
+    }
+
+    // Pick 1-2 random creatures to speak
+    const speakers = all.sort(() => Math.random() - 0.5).slice(0, Math.min(2, all.length));
+    for (const creature of speakers) {
+      const personality = getPersonality(creature.dna);
+      const text = pickSpeech(event, personality, speechLang);
+      if (text) {
+        panelProvider.postMessage({ type: 'creatureSpeech', creatureId: creature.id, text });
+      }
+    }
+  }
+
+  // ── Feature D: Friendship graph from import dependencies ────
+  let friendshipPairs: { a: string; b: string }[] = [];
+  let lastFriendshipScan = 0;
+  const FRIENDSHIP_SCAN_INTERVAL = 60000; // rescan every 60s
+
+  function updateFriendships(): void {
+    const now = Date.now();
+    if (now - lastFriendshipScan < FRIENDSHIP_SCAN_INTERVAL) return;
+    lastFriendshipScan = now;
+
+    const filePaths = creatureManager.getAll().map(c => c.sourceFile);
+    if (filePaths.length < 2) return;
+
+    try {
+      const raw = analyzeFriendships(filePaths);
+      // Convert file pairs to creature ID pairs
+      friendshipPairs = [];
+      for (const { fileA, fileB } of raw) {
+        const idA = creatureManager.getByFile(fileA);
+        const idB = creatureManager.getByFile(fileB);
+        if (idA && idB) {
+          friendshipPairs.push({ a: idA, b: idB });
+        }
+      }
+      panelProvider.postMessage({ type: 'friendships', pairs: friendshipPairs });
+    } catch {
+      // Import analysis failed silently
+    }
+  }
+
+  // ── Feature E: Proactive creature suggestions ───────────────
+  let lastSuggestionTime = 0;
+  const SUGGESTION_INTERVAL = 120000; // at most one suggestion every 2 min
+
+  function checkProactiveSuggestions(): void {
+    const now = Date.now();
+    if (now - lastSuggestionTime < SUGGESTION_INTERVAL) return;
+
+    const candidates = creatureManager.getAll().filter(c => {
+      if (c.stage === 'egg') return false;
+      const h = c.fileHealth;
+      const daysSince = (now - h.lastModified) / 864e5;
+      return h.bugCount >= 3 || h.lineCount > 400 || daysSince > 5;
+    });
+
+    if (candidates.length === 0) return;
+
+    // Pick the worst-off creature
+    const worst = candidates.sort((a, b) => {
+      const scoreA = a.fileHealth.bugCount * 10 + (a.fileHealth.lineCount > 400 ? 5 : 0);
+      const scoreB = b.fileHealth.bugCount * 10 + (b.fileHealth.lineCount > 400 ? 5 : 0);
+      return scoreB - scoreA;
+    })[0];
+
+    const personality = getPersonality(worst.dna);
+    const text = pickSpeech('suggest', personality, speechLang);
+
+    const h = worst.fileHealth;
+    let action: string;
+    let description: string;
+    if (h.bugCount >= 3) {
+      action = 'cure';
+      description = `${h.bugCount} bugs found`;
+    } else if (h.lineCount > 400) {
+      action = 'diet';
+      description = `${h.lineCount} lines — too heavy`;
+    } else {
+      action = 'wake';
+      description = 'hasn\'t been touched in a while';
+    }
+
+    panelProvider.postMessage({
+      type: 'creatureSuggestion',
+      creatureId: worst.id,
+      creatureName: worst.name,
+      action,
+      description,
+    });
+
+    // Also show as speech
+    if (text) {
+      panelProvider.postMessage({ type: 'creatureSpeech', creatureId: worst.id, text });
+    }
+
+    lastSuggestionTime = now;
+  }
+
+  // ── Feature C: Morning diary ────────────────────────────────
+  let morningSent = false;
+
+  function sendMorningDiary(): void {
+    if (morningSent) return;
+    morningSent = true;
+
+    const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
+    if (all.length === 0) return;
+
+    // Pick the first creature and generate a diary-like summary
+    const creature = all[0];
+    const h = creature.fileHealth;
+    const daysSince = Math.floor((Date.now() - h.lastModified) / 864e5);
+
+    let entry: string;
+    if (speechLang === 'ja') {
+      if (h.bugCount > 0) {
+        entry = `きのうから${h.bugCount}このバグがある...がんばらなきゃ`;
+      } else if (daysSince > 3) {
+        entry = `${daysSince}にちもさわってもらえてない...さみしいな`;
+      } else if (h.lineCount > 300) {
+        entry = `${h.lineCount}ぎょう...ちょっとおもたいかも`;
+      } else {
+        entry = 'きょうもいちにちがんばろう！';
+      }
+    } else {
+      if (h.bugCount > 0) {
+        entry = `Still have ${h.bugCount} bugs since yesterday... gotta push through`;
+      } else if (daysSince > 3) {
+        entry = `No one touched me for ${daysSince} days... lonely`;
+      } else if (h.lineCount > 300) {
+        entry = `${h.lineCount} lines... feeling a bit heavy`;
+      } else {
+        entry = 'Ready for a new day!';
+      }
+    }
+
+    panelProvider.postMessage({ type: 'diary', creatureId: creature.id, entry });
+  }
+
   // Monitor manager
   const monitorManager = new MonitorManager(workspacePath, {
     onFileCreated: (filePath: string) => {
@@ -121,7 +284,12 @@ export function activate(context: vscode.ExtensionContext): void {
         saveState();
       }
     },
-    onFileChanged: (_filePath: string) => {
+    onFileChanged: (filePath: string) => {
+      // Feature A: living words on file save — speak to the affected creature
+      const savedCreatureId = creatureManager.getByFile(filePath);
+      if (savedCreatureId) {
+        broadcastSpeech('save', savedCreatureId);
+      }
       // Bug count is updated via onBugCountChanged
       // If any agent is running, briefly show generating status
       for (const agent of agentManager.getAll()) {
@@ -162,7 +330,9 @@ export function activate(context: vscode.ExtensionContext): void {
       panelProvider.postMessage({ type: 'commitDetected' });
       for (const id of leveledUp) {
         panelProvider.postMessage({ type: 'levelUp', creatureId: id });
+        broadcastSpeech('levelUp', id); // Feature A: living words on level up
       }
+      broadcastSpeech('commit'); // Feature A: living words on commit
       sendWorldUpdate();
       saveState();
       void dnaAnalyzer.analyze().then(dna => { currentDNA = dna; });
@@ -187,6 +357,7 @@ export function activate(context: vscode.ExtensionContext): void {
             creatureId: healedCreature.id,
             creatureName: healedCreature.name,
           });
+          broadcastSpeech('heal', healedCreature.id); // Feature A: living words on heal
         }
         updateStatusBar();
       }
@@ -200,6 +371,13 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'ready':
         sendWorldUpdate();
+        // Feature C: morning diary on session start
+        if (!isFirstRun) {
+          setTimeout(() => sendMorningDiary(), 2000);
+          broadcastSpeech('morning');
+        }
+        // Feature D: initial friendship scan
+        setTimeout(() => updateFriendships(), 3000);
         break;
       case 'action':
         if (message.action === 'feed') {
@@ -438,24 +616,32 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Game loop (paused when panel is not visible)
-  let tickTimer: ReturnType<typeof setInterval> | null = setInterval(() => {
+  // Slow-tick counter for periodic checks (friendship, proactive care)
+  let slowTickCounter = 0;
+
+  function tickAll(): void {
     creatureManager.tick(TICK_INTERVAL);
     agentManager.tick();
     sendWorldUpdate();
     throttledStatusBarUpdate();
-  }, TICK_INTERVAL);
+
+    // Slow tick: run expensive checks every ~10 seconds
+    slowTickCounter++;
+    if (slowTickCounter >= 50) {
+      slowTickCounter = 0;
+      updateFriendships();       // Feature D
+      checkProactiveSuggestions(); // Feature E
+    }
+  }
+
+  // Game loop (paused when panel is not visible)
+  let tickTimer: ReturnType<typeof setInterval> | null = setInterval(tickAll, TICK_INTERVAL);
 
   function startTickTimer(): void {
     if (tickTimer !== null) {
       return;
     }
-    tickTimer = setInterval(() => {
-      creatureManager.tick(TICK_INTERVAL);
-      agentManager.tick();
-      sendWorldUpdate();
-      throttledStatusBarUpdate();
-    }, TICK_INTERVAL);
+    tickTimer = setInterval(tickAll, TICK_INTERVAL);
   }
 
   function stopTickTimer(): void {

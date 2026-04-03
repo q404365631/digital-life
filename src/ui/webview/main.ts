@@ -308,6 +308,12 @@ const eduMessage = document.getElementById('edu-message');
 // AI Action preview state
 let pendingAiAction: { creatureId: string; action: string; description: string } | null = null;
 
+// Feature A: Event-driven speech overrides (creature id → text + timestamp)
+const eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = new Map();
+
+// Feature D: Friendship pairs (creature ID pairs from import analysis)
+let friendshipPairs: readonly { a: string; b: string }[] = [];
+
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
 type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
@@ -360,7 +366,7 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       const lvCreature = creatures.find(c => c.id === message.creatureId);
       if (lvCreature) {
         renderer.triggerFeedEffect(lvCreature.position.x, lvCreature.position.y);
-        soundEngine.playHatch();
+        soundEngine.playLevelUp();
       }
       break;
     }
@@ -370,8 +376,42 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       const healedCreature = creatures.find(c => c.id === message.creatureId);
       if (healedCreature) {
         renderer.triggerHealEffect(healedCreature.position.x, healedCreature.position.y, message.creatureId);
-        soundEngine.playPet();
+        soundEngine.playHeal();
       }
+      break;
+    }
+
+    case 'creatureSpeech': {
+      // Feature A: Living words — event-driven speech override
+      eventSpeechOverrides.set(message.creatureId, { text: message.text, timestamp: Date.now() });
+      soundEngine.playSpeech();
+      break;
+    }
+
+    case 'creatureSuggestion': {
+      // Feature E: Proactive creature care suggestion
+      pendingAiAction = {
+        creatureId: message.creatureId,
+        action: message.action,
+        description: message.description,
+      };
+      selectedCreatureId = message.creatureId;
+      showAiApproval(`${message.creatureName}: ${message.description}`);
+      soundEngine.playSuggestion();
+      btnCare?.classList.add('guide-pulse');
+      break;
+    }
+
+    case 'friendships': {
+      // Feature D: Store friendship pairs for rendering
+      friendshipPairs = message.pairs;
+      break;
+    }
+
+    case 'diary': {
+      // Feature C: Morning diary — show as speech on the creature
+      eventSpeechOverrides.set(message.creatureId, { text: message.entry, timestamp: Date.now() });
+      soundEngine.playMorning();
       break;
     }
 
@@ -696,6 +736,7 @@ function hideAiApproval(): void {
   const cancelBtn = document.getElementById('btn-cancel-ai');
   approveBtn?.classList.add('hidden');
   cancelBtn?.classList.add('hidden');
+  btnCare?.classList.remove('guide-pulse'); // clear suggestion glow
 }
 
 // ── Guide flow state machine ───────────────────────────────
@@ -885,7 +926,7 @@ function gameLoop(timestamp: number): void {
         return { ...a, position: smoothed };
       });
 
-      renderer.render(smoothCreatures, worldData, bugCount, zoomLevel, panX, panY, selectedCreatureId, draggingCreatureId, smoothAgents, agentChats);
+      renderer.render(smoothCreatures, worldData, bugCount, zoomLevel, panX, panY, selectedCreatureId, draggingCreatureId, smoothAgents, agentChats, eventSpeechOverrides, friendshipPairs);
     }
   }
 

@@ -23,8 +23,15 @@ export class SpriteRenderer {
   // Healed creature IDs (set by GameRenderer for speech bubble override)
   private healedIds: Set<string> = new Set();
 
+  // Event-driven speech overrides (Feature A: Living words)
+  private eventSpeech: Map<string, string> = new Map();
+
   setHealedIds(ids: Set<string>): void {
     this.healedIds = ids;
+  }
+
+  setEventSpeech(overrides: Map<string, string>): void {
+    this.eventSpeech = overrides;
   }
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -349,16 +356,26 @@ export class SpriteRenderer {
   }
 
   private getCreatureMood(creature: CreatureData): string | null {
+    // Feature A: Event-driven speech override (highest priority)
+    const eventText = this.eventSpeech.get(creature.id);
+    if (eventText) return eventText;
+
     // Recently healed — override with recovery message
     if (this.healedIds.has(creature.id)) return t('bubble_healed');
 
     const h = creature.fileHealth;
     const stale = (Date.now() - h.lastModified) / 864e5;
 
+    // Feature B: Richer emotional vocabulary based on specific conditions
+    if (creature.hunger < 10)   return t('bubble_starving');
     if (creature.hunger < 20)   return t('bubble_hungry');
+    if (h.bugCount > 5)         return t('bubble_very_sick');
     if (h.bugCount > 2)         return t('bubble_sick');
+    if (h.lineCount > 500)      return t('bubble_very_heavy');
     if (h.lineCount > 400)      return t('bubble_heavy');
+    if (stale > 10)             return t('bubble_abandoned');
     if (stale > 5)              return t('bubble_sleepy');
+    if (creature.happiness > 80 && h.bugCount === 0 && h.lineCount < 200) return t('bubble_perfect');
     if (creature.happiness > 70 && h.bugCount === 0) return t('bubble_happy');
     return null;
   }

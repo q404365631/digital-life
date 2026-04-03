@@ -125,6 +125,10 @@ export type ExtToWebMessage =
   | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string }
   | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string }
   | { readonly type: 'creatureHealed'; readonly creatureId: string; readonly creatureName: string }
+  | { readonly type: 'creatureSpeech'; readonly creatureId: string; readonly text: string }
+  | { readonly type: 'creatureSuggestion'; readonly creatureId: string; readonly creatureName: string; readonly action: string; readonly description: string }
+  | { readonly type: 'friendships'; readonly pairs: readonly { a: string; b: string }[] }
+  | { readonly type: 'diary'; readonly creatureId: string; readonly entry: string }
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
   | { readonly type: 'levelUp'; readonly creatureId: string };
 
