@@ -468,7 +468,7 @@ export class SpriteRenderer {
   }
 
   renderAgent(agent: AgentData, isSelected: boolean = false): void {
-    const AGENT_RENDER_SIZE = 36;
+    const AGENT_RENDER_SIZE = 48;
     const renderSize = AGENT_RENDER_SIZE;
     const isMoving = agent.targetPosition !== null;
 
