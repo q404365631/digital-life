@@ -72,6 +72,13 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Return focus to the webview after a terminal switch */
+  focusWebview(): void {
+    if (this.view) {
+      this.view.show(false);
+    }
+  }
+
   /** Read a PNG file and return as data:image/png;base64,... URI */
   private toDataUri(filePath: string): string {
     try {

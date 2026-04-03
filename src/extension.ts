@@ -498,14 +498,13 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       }
       case 'clickAgent': {
-        console.log(`[DL] clickAgent received: ${message.agentId}`);
         const agent = agentManager.getById(message.agentId);
-        console.log(`[DL] agent found: ${agent ? agent.name : 'NOT FOUND'}`);
-        console.log(`[DL] agentTerminals keys: ${[...agentTerminals.keys()].join(', ')}`);
         if (agent) {
           const terminal = getAgentTerminal(agent.id, agent.name, agent.agentType);
-          console.log(`[DL] terminal name: ${terminal.name}, exitStatus: ${terminal.exitStatus}`);
-          terminal.show(true);
+          // 1. Switch terminal (takes focus momentarily)
+          terminal.show(false);
+          // 2. Return focus to webview so next click works
+          setTimeout(() => panelProvider.focusWebview(), 150);
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
         }
