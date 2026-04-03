@@ -82,6 +82,15 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Read an MP3 file and return raw base64 (no data URI prefix — decoded in AudioContext) */
+  private toBase64(filePath: string): string {
+    try {
+      return fs.readFileSync(filePath).toString('base64');
+    } catch {
+      return '';
+    }
+  }
+
   private getHtml(_webview: vscode.Webview): string {
     const spritesDir = path.join(this.extensionUri.fsPath, 'dist', 'sprites');
 
@@ -115,6 +124,27 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       };
     }
 
+    // Sound assets as raw base64 (decoded to AudioBuffer in SoundEngine)
+    // Mapping by the Dragon Quest Development Team (堀井雄二)
+    const soundsDir = path.join(this.extensionUri.fsPath, 'assets', 'sounds');
+    const soundMap: Record<string, string> = {
+      feed:       this.toBase64(path.join(soundsDir, 'マウスダブルクリック.mp3')),
+      pet:        this.toBase64(path.join(soundsDir, 'マウスクリック.mp3')),
+      hatch:      this.toBase64(path.join(soundsDir, '8bitジャンプ3.mp3')),
+      commit:     this.toBase64(path.join(soundsDir, '正解9.mp3')),
+      levelUp:    this.toBase64(path.join(soundsDir, '8bitジャンプ.mp3')),
+      death:      this.toBase64(path.join(soundsDir, '不正解3.mp3')),
+      heal:       this.toBase64(path.join(soundsDir, '完了6.mp3')),
+      speech:     this.toBase64(path.join(soundsDir, '8bitかわす.mp3')),
+      suggestion: this.toBase64(path.join(soundsDir, '8bitアラート1.mp3')),
+      approve:    this.toBase64(path.join(soundsDir, '決定7.mp3')),
+      morning:    this.toBase64(path.join(soundsDir, '電源オン.mp3')),
+      error:      this.toBase64(path.join(soundsDir, 'エラー1.mp3')),
+      friendship: this.toBase64(path.join(soundsDir, '出題3.mp3')),
+      firstRun:   this.toBase64(path.join(soundsDir, '扉が開く2.mp3')),
+      cancel:     this.toBase64(path.join(soundsDir, '8bitアラート3.mp3')),
+    };
+
     return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -130,6 +160,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       creatures: ${JSON.stringify(creatureSprites)},
       agents: ${JSON.stringify(agentSprites)},
     };
+    window.__SOUNDS__ = ${JSON.stringify(soundMap)};
   </script>
   <div id="app">
     <div id="canvas-wrapper">

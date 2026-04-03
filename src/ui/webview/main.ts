@@ -436,6 +436,7 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'firstRun': {
       // Ceremony: files already exist → spawn them as creatures one by one
+      soundEngine.playFirstRun();
       beginFirstRunCeremony(message.files as { path: string; name: string; species: string }[]);
       break;
     }
@@ -699,7 +700,7 @@ function showAiApproval(description: string): void {
             creatureId: pendingAiAction.creatureId,
             action: pendingAiAction.action,
           });
-          soundEngine.playFeed();
+          soundEngine.playApprove();
           const creature = creatures.find(c => c.id === pendingAiAction!.creatureId);
           if (creature) {
             renderer.triggerFeedEffect(creature.position.x, creature.position.y);
@@ -720,6 +721,7 @@ function showAiApproval(description: string): void {
       cancelBtn.textContent = t('cancel');
       cancelBtn.addEventListener('click', () => {
         pendingAiAction = null;
+        soundEngine.playCancel();
         hideAiApproval();
         hideEduMessage();
       });
