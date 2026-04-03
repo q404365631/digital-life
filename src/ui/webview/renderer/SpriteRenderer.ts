@@ -392,7 +392,7 @@ export class SpriteRenderer {
     this.ctx.beginPath();
     this.ctx.roundRect(nameX - nameWidth / 2 - 4, nameY - 9, nameWidth + 8, 12, 4);
     this.ctx.fill();
-    this.ctx.fillStyle = '#FFD700';
+    this.ctx.fillStyle = '#00FF00';
     this.ctx.fillText(agent.name, nameX, nameY);
     this.ctx.restore();
 
