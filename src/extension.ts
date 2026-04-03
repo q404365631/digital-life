@@ -498,18 +498,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       }
       case 'clickAgent': {
-        const agent = agentManager.getById(message.agentId);
-        if (!agent) {
-          void vscode.window.showInformationMessage(`[DL] Agent NOT FOUND: ${message.agentId}`);
-          return true;
-        }
-        const terminal = agentTerminals.get(agent.id);
-        if (!terminal) {
-          void vscode.window.showInformationMessage(`[DL] Terminal NOT FOUND for: ${agent.name} (${agent.id})`);
-          return true;
-        }
-        void vscode.window.showInformationMessage(`[DL] Switching to: ${terminal.name}`);
-        terminal.show(false);
+        // Terminal switching now handled by selectAgent
         return true;
       }
       case 'deleteAgent': {
@@ -544,10 +533,19 @@ export function activate(context: vscode.ExtensionContext): void {
         agentManager.moveByKey(message.agentId, message.dx, message.dy);
         sendWorldUpdate();
         return true;
-      case 'selectAgent':
+      case 'selectAgent': {
         agentManager.selectAgent(message.agentId);
+        // Switch terminal when agent is selected (most reliable path)
+        const selAgent = agentManager.getById(message.agentId);
+        if (selAgent) {
+          const selTerminal = agentTerminals.get(selAgent.id);
+          if (selTerminal && !selTerminal.exitStatus) {
+            selTerminal.show(true);
+          }
+        }
         sendWorldUpdate();
         return true;
+      }
       case 'sitAgent':
         agentManager.toggleSit(message.agentId);
         sendWorldUpdate();
