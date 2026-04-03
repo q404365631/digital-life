@@ -480,7 +480,6 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
-        void vscode.window.showInformationMessage(`[addAgent] raw="${rawType}"`);
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
@@ -657,10 +656,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
-    // DEBUG: log EVERY agent-related message
-    if (message.type !== 'ready' && message.type !== 'moveCreature' && message.type !== 'moveAgent' && message.type !== 'moveAgentByKey') {
-      void vscode.window.showInformationMessage(`[MSG] ${message.type}`);
-    }
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
@@ -839,7 +834,10 @@ export function activate(context: vscode.ExtensionContext): void {
   function createAgentTerminal(agentId: string, name: string, agentType: AgentType): vscode.Terminal {
     agentTerminalCounter++;
     const suffix = agentTerminalCounter > 1 ? ` #${agentTerminalCounter}` : '';
-    const terminal = vscode.window.createTerminal({ name: `${agentTerminalName(name)}${suffix}` });
+    const terminal = vscode.window.createTerminal({
+      name: `${agentTerminalName(name)}${suffix}`,
+      location: vscode.TerminalLocation.Panel, // Force bottom panel — show() only works here
+    });
     agentTerminals.set(agentId, terminal);
     const cmd = AGENT_TERMINAL_CMDS[agentType];
     if (cmd) { terminal.sendText(cmd); }
