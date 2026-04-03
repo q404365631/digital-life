@@ -256,13 +256,19 @@ canvas.addEventListener('pointermove', (event: PointerEvent) => {
 });
 
 canvas.addEventListener('pointerup', (event: PointerEvent) => {
-  // Handle creature drop
+  // Handle creature drop — or tap-to-select if not dragged
   if (draggingCreatureId) {
-    const override = dragOverridePositions.get(draggingCreatureId);
+    const creatureId = draggingCreatureId;
+    const override = dragOverridePositions.get(creatureId);
     if (override && dragMoved) {
-      vscode.postMessage({ type: 'moveCreature', creatureId: draggingCreatureId, position: override });
+      vscode.postMessage({ type: 'moveCreature', creatureId, position: override });
+    } else if (!dragMoved) {
+      // Tap (no drag): select creature + reveal file
+      selectedCreatureId = creatureId;
+      soundEngine.playSelectCreature();
+      vscode.postMessage({ type: 'revealFile', creatureId });
     }
-    dragOverridePositions.delete(draggingCreatureId);
+    dragOverridePositions.delete(creatureId);
     draggingCreatureId = null;
     dragMoved = false;
     canvas.classList.remove('dragging-creature');
@@ -270,13 +276,21 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
     return;
   }
 
-  // Handle agent drop
+  // Handle agent drop — or tap-to-select if not dragged
   if (draggingAgentId) {
-    const override = dragOverridePositions.get(draggingAgentId);
+    const agentId = draggingAgentId;
+    const override = dragOverridePositions.get(agentId);
     if (override && dragMoved) {
-      vscode.postMessage({ type: 'moveAgent', agentId: draggingAgentId, position: override });
+      vscode.postMessage({ type: 'moveAgent', agentId, position: override });
+    } else if (!dragMoved) {
+      // Tap (no drag): select agent + switch terminal
+      selectedAgentId = agentId;
+      renderer.setSelectedAgentId(agentId);
+      soundEngine.playSelectAgent();
+      vscode.postMessage({ type: 'selectAgent', agentId });
+      vscode.postMessage({ type: 'clickAgent', agentId });
     }
-    dragOverridePositions.delete(draggingAgentId);
+    dragOverridePositions.delete(agentId);
     draggingAgentId = null;
     dragMoved = false;
     canvas.classList.remove('dragging-creature');
