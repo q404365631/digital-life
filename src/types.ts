@@ -127,7 +127,7 @@ export type ExtToWebMessage =
 export type WebToExtMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'action'; readonly action: 'pet' | 'feed'; readonly targetId: string }
-  | { readonly type: 'heal'; readonly action: 'diet' | 'cure' | 'wake'; readonly targetId: string }
+  | { readonly type: 'heal'; readonly action: 'diet' | 'cure' | 'wake' | 'feed'; readonly targetId: string }
   | { readonly type: 'nameCreature'; readonly creatureId: string; readonly name: string }
   | { readonly type: 'moveCreature'; readonly creatureId: string; readonly position: Position }
   | { readonly type: 'addAgent'; readonly agentType: AgentType }

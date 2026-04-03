@@ -125,6 +125,9 @@ export class GameRenderer {
       }
     }
 
+    // Code health report
+    this.uiRenderer.renderHealthReport(creatures);
+
     // Commit effect (UI layer)
     this.updateCommitEffect();
     if (this.commitEffectProgress > 0) {

@@ -1,4 +1,4 @@
-import { Weather, CodingDNA } from '../../../types';
+import { Weather, CodingDNA, CreatureData } from '../../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
 import { t } from '../i18n';
@@ -164,6 +164,115 @@ export class UIRenderer {
       this.ctx.beginPath();
       this.ctx.roundRect(barX, y, barMaxW * entry.value, barH, 3);
       this.ctx.fill();
+    }
+
+    this.ctx.restore();
+  }
+
+  renderHealthReport(creatures: readonly CreatureData[]): void {
+    if (creatures.length === 0) { return; }
+
+    // Aggregate health metrics
+    let totalLines = 0;
+    let totalBugs = 0;
+    let healthyFiles = 0;
+    let fatFiles = 0;
+    let abandonedFiles = 0;
+    let totalLevel = 0;
+
+    for (const c of creatures) {
+      if (c.stage === 'egg') { continue; }
+      const h = c.fileHealth;
+      totalLines += h.lineCount;
+      totalBugs += h.bugCount;
+      totalLevel += c.level;
+      if (h.bugCount === 0 && h.lineCount > 0 && h.lineCount <= 100) { healthyFiles++; }
+      if (h.lineCount > 300) { fatFiles++; }
+      const daysSince = (Date.now() - h.lastModified) / (1000 * 60 * 60 * 24);
+      if (daysSince > 3) { abandonedFiles++; }
+    }
+
+    const activeCreatures = creatures.filter(c => c.stage !== 'egg').length;
+    const avgLevel = activeCreatures > 0 ? Math.round(totalLevel / activeCreatures * 10) / 10 : 0;
+
+    // Health score: 0-100
+    let score = 100;
+    if (activeCreatures > 0) {
+      score -= Math.min(30, totalBugs * 5);
+      score -= Math.min(20, fatFiles * 10);
+      score -= Math.min(20, abandonedFiles * 10);
+      score += Math.min(20, healthyFiles * 5);
+      score = Math.max(0, Math.min(100, score));
+    }
+
+    // Render panel at top-right area
+    const panelW = 130;
+    const panelH = 72;
+    const panelX = CANVAS_WIDTH - panelW - 8;
+    const panelY = 38;
+
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(panelX, panelY, panelW, panelH, 6);
+    this.ctx.fill();
+
+    // Title
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.font = 'bold 9px sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(t('health_report'), panelX + 6, panelY + 12);
+
+    // Health score bar
+    const barX = panelX + 6;
+    const barY = panelY + 18;
+    const barW = panelW - 12;
+    const barH = 8;
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(barX, barY, barW, barH, 3);
+    this.ctx.fill();
+
+    const scoreColor = score >= 70 ? '#4CAF50' : score >= 40 ? '#FFA726' : '#EF5350';
+    this.ctx.fillStyle = scoreColor;
+    this.ctx.beginPath();
+    this.ctx.roundRect(barX, barY, barW * (score / 100), barH, 3);
+    this.ctx.fill();
+
+    // Score label
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.font = 'bold 8px sans-serif';
+    this.ctx.textAlign = 'right';
+    this.ctx.fillText(`${Math.round(score)}%`, panelX + panelW - 6, barY + 7);
+
+    // Stats
+    this.ctx.font = '8px sans-serif';
+    this.ctx.textAlign = 'left';
+    const statsY = barY + 16;
+    const lineH = 11;
+
+    this.ctx.fillStyle = '#90CAF9';
+    this.ctx.fillText(`${t('total_lines')}: ${totalLines}`, barX, statsY);
+
+    this.ctx.fillStyle = totalBugs > 0 ? '#EF5350' : '#4CAF50';
+    this.ctx.fillText(`${t('bugs')}: ${totalBugs}`, barX, statsY + lineH);
+
+    this.ctx.fillStyle = '#FFD700';
+    this.ctx.fillText(`${t('avg_level')}: ${avgLevel}`, barX + 65, statsY);
+
+    this.ctx.fillStyle = healthyFiles > 0 ? '#4CAF50' : '#90A4AE';
+    this.ctx.fillText(`${t('healthy')}: ${healthyFiles}`, barX + 65, statsY + lineH);
+
+    // Warning indicators
+    const warningY = statsY + lineH * 2;
+    if (fatFiles > 0) {
+      this.ctx.fillStyle = '#FFA726';
+      this.ctx.fillText(`${t('fat_files')}: ${fatFiles}`, barX, warningY);
+    }
+    if (abandonedFiles > 0) {
+      this.ctx.fillStyle = '#90A4AE';
+      this.ctx.fillText(`${t('abandoned')}: ${abandonedFiles}`, barX + 65, warningY);
     }
 
     this.ctx.restore();

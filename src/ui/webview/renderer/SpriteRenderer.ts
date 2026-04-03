@@ -115,6 +115,10 @@ export class SpriteRenderer {
     let row = 0;
     let flipX = false;
 
+    // Evolution visual: adult creatures render larger
+    const isAdult = creature.stage === 'adult';
+    const evolutionScale = isAdult ? 1.2 : 1.0;
+
     const anim = creature.animationState;
     if (anim === 'walk_down') {
       row = 1;
@@ -154,12 +158,21 @@ export class SpriteRenderer {
       col = frameIndex;
     }
 
+    // Combine file-size scale with evolution scale
+    const totalScale = scaleX * evolutionScale;
+
     this.ctx.save();
 
-    if (scaleX !== 1.0) {
+    if (totalScale !== 1.0) {
       this.ctx.translate(creature.position.x, creature.position.y);
-      this.ctx.scale(scaleX, 1.0);
+      this.ctx.scale(totalScale, evolutionScale);
       this.ctx.translate(-creature.position.x, -creature.position.y);
+    }
+
+    // Adult glow effect
+    if (isAdult) {
+      this.ctx.shadowColor = '#FFD700';
+      this.ctx.shadowBlur = 6;
     }
 
     const bugCount = creature.fileHealth?.bugCount ?? 0;
@@ -183,20 +196,42 @@ export class SpriteRenderer {
       return;
     }
 
-    // Name label with background pill
+    // Name label with level badge
     if (creature.stage !== 'egg') {
       this.ctx.save();
-      this.ctx.font = 'bold 10px sans-serif';
-      this.ctx.textAlign = 'center';
       const nameX = creature.position.x;
       const nameY = creature.position.y - renderSize / 2 - 8;
+
+      // Level badge
+      const lvText = `Lv.${creature.level}`;
+      this.ctx.font = 'bold 7px sans-serif';
+      const lvWidth = this.ctx.measureText(lvText).width;
+
+      // Name
+      this.ctx.font = 'bold 10px sans-serif';
+      this.ctx.textAlign = 'center';
       const nameWidth = this.ctx.measureText(creature.name).width;
+
+      const totalWidth = nameWidth + lvWidth + 10;
+
+      // Background pill
       this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       this.ctx.beginPath();
-      this.ctx.roundRect(nameX - nameWidth / 2 - 4, nameY - 9, nameWidth + 8, 13, 4);
+      this.ctx.roundRect(nameX - totalWidth / 2 - 2, nameY - 9, totalWidth + 4, 13, 4);
       this.ctx.fill();
+
+      // Name text
       this.ctx.fillStyle = '#FFFFFF';
-      this.ctx.fillText(creature.name, nameX, nameY);
+      this.ctx.font = 'bold 10px sans-serif';
+      this.ctx.fillText(creature.name, nameX - lvWidth / 2 - 2, nameY);
+
+      // Level text (colored by stage)
+      const lvColor = isAdult ? '#FFD700' : creature.stage === 'baby' ? '#90CAF9' : '#AAAAAA';
+      this.ctx.fillStyle = lvColor;
+      this.ctx.font = 'bold 7px sans-serif';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText(lvText, nameX + nameWidth / 2 - lvWidth / 2 + 2, nameY);
+
       this.ctx.restore();
     }
 

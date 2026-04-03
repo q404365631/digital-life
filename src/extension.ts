@@ -43,12 +43,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Restore state
   const savedState = storage.load();
+  let isFirstRun = false;
   if (savedState) {
     creatureManager.loadCreatures(savedState.creatures);
     worldState = savedState.world;
     // Don't restore saved agents - start fresh each session
   } else {
     worldState = createInitialWorldState();
+    isFirstRun = true;
   }
 
   // DNA Analyzer
@@ -153,6 +155,17 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'action':
         if (message.action === 'feed') {
           creatureManager.feed(message.targetId);
+          // Also send AI auto-prompt for the file
+          const feedCreature = creatureManager.getById(message.targetId);
+          if (feedCreature) {
+            const aiTerminal = findOrCreateClaudeTerminal();
+            if (aiTerminal.isNew) {
+              setTimeout(() => sendHealCommand(aiTerminal.terminal, 'feed', feedCreature), 3000);
+            } else {
+              aiTerminal.terminal.show();
+              sendHealCommand(aiTerminal.terminal, 'feed', feedCreature);
+            }
+          }
         } else if (message.action === 'pet') {
           creatureManager.pet(message.targetId);
         }
@@ -353,6 +366,45 @@ export function activate(context: vscode.ExtensionContext): void {
   // Start monitoring
   void monitorManager.start();
 
+  // Auto-adopt files on first run (initial experience)
+  if (isFirstRun) {
+    void autoAdoptFiles();
+  }
+
+  async function autoAdoptFiles(): Promise<void> {
+    const files = await vscode.workspace.findFiles(
+      '**/*.{ts,tsx,js,jsx,py,go,rs,java,rb,php,swift,kt,cs,c,cpp,h,vue,svelte}',
+      '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/.next/**}'
+    );
+
+    // Limit to first 20 files to avoid overwhelming new users
+    const limit = Math.min(files.length, 20);
+    let adoptedCount = 0;
+
+    for (let i = 0; i < limit; i++) {
+      if (creatureManager.getCount() >= MAX_CREATURES) { break; }
+      const filePath = files[i].fsPath;
+      if (creatureManager.hasCreatureForFile(filePath)) { continue; }
+
+      const species = getSpeciesForFile(filePath);
+      const fileName = path.basename(filePath);
+      const name = fileName.replace(/\.[^.]+$/, '');
+      const creature = creatureManager.spawnCreature(filePath, name, species, currentDNA);
+      if (creature) {
+        panelProvider.postMessage({ type: 'creatureBorn', creature });
+        adoptedCount++;
+      }
+    }
+
+    if (adoptedCount > 0) {
+      saveState();
+      sendWorldUpdate();
+      void vscode.window.showInformationMessage(
+        `Digital Life: ${adoptedCount} creatures born from your code! 🎉`
+      );
+    }
+  }
+
   // Cleanup
   context.subscriptions.push({
     dispose: () => {
@@ -482,18 +534,44 @@ export function activate(context: vscode.ExtensionContext): void {
   function sendHealCommand(terminal: vscode.Terminal, action: string, creature: CreatureData): void {
     const filePath = creature.sourceFile;
     const fileName = path.basename(filePath);
+    const relativePath = vscode.workspace.asRelativePath(filePath);
+    const health = creature.fileHealth;
 
     switch (action) {
+      case 'feed':
+        // Feed = AI auto-prompt: optimize and improve the file
+        terminal.sendText(
+          `${relativePath}を分析して、パフォーマンスの改善点があれば最適化してください。` +
+          `変数名や関数名でわかりにくいものがあれば改善し、コードの可読性を向上させてください。` +
+          `変更は最小限に、既存の動作を壊さないようにしてください。`
+        );
+        break;
       case 'diet':
-        terminal.sendText(`${fileName}を200行以下になるようにリファクタリングしてください。関数を小さなモジュールに分割して、各ファイルは1つの責務だけを持つようにしてください。`);
+        terminal.sendText(
+          `${relativePath}は現在${health.lineCount}行あります。200行以下になるようにリファクタリングしてください。` +
+          `関数を小さなモジュールに分割して、各ファイルは1つの責務だけを持つようにしてください。` +
+          `分割先のファイル名は意味のある名前にしてください。`
+        );
         break;
       case 'cure':
-        terminal.sendText(`${fileName}のコード品質を改善してください。console.logを全て削除、any型を適切な型に置き換え、TODOコメントを解決してください。`);
+        terminal.sendText(
+          `${relativePath}のコード品質を改善してください。` +
+          `具体的には：console.logを全て削除、any型を適切な型に置き換え、TODOコメントを実装で解決してください。` +
+          `現在${health.bugCount}件の問題が検出されています。`
+        );
         break;
       case 'wake':
-        terminal.sendText(`${fileName}をレビューしてください。不要なコードがあれば削除し、古いパターンがあれば最新のベストプラクティスに更新してください。`);
+        terminal.sendText(
+          `${relativePath}をレビューしてください。このファイルは長期間更新されていません。` +
+          `不要なコードがあれば削除し、古いパターンがあれば最新のベストプラクティスに更新してください。` +
+          `deprecatedなAPIがあれば最新版に移行してください。`
+        );
         break;
     }
+
+    // Award heal EXP bonus
+    creatureManager.healBonus(filePath);
+    saveState();
   }
 
   function sendWorldUpdate(): void {

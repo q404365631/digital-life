@@ -117,8 +117,19 @@ export class CreatureManager {
 
   commitBonus(): void {
     for (const [id, creature] of this.creatures) {
-      this.creatures.set(id, addExp(creature, 10));
+      // Scaling bonus: higher level creatures gain more from commits
+      const bonus = 10 + creature.level * 2;
+      this.creatures.set(id, addExp(creature, bonus));
     }
+  }
+
+  /** Award EXP when file health improves (bugs fixed, lines reduced) */
+  healBonus(sourceFile: string): void {
+    const creatureId = this.fileToCreatureId.get(sourceFile);
+    if (!creatureId) { return; }
+    const creature = this.creatures.get(creatureId);
+    if (!creature) { return; }
+    this.creatures.set(creatureId, addExp(creature, 20));
   }
 
   updateBugEffect(hasBugs: boolean): void {

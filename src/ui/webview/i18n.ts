@@ -39,6 +39,12 @@ const translations: Record<Language, Record<string, string>> = {
     'click_cure': '\u{1F48A} Click a sick creature!',
     'click_wake': '\u{23F0} Click a sleeping creature!',
     'add_agent': '+ Agent',
+    'health_report': 'Code Health',
+    'total_lines': 'Lines',
+    'avg_level': 'Avg Lv',
+    'healthy': 'Healthy',
+    'fat_files': 'Fat',
+    'abandoned': 'Idle',
   },
   ja: {
     'goal': 'みんなを大切に育てよう',
@@ -78,6 +84,12 @@ const translations: Record<Language, Record<string, string>> = {
     'click_cure': '\u{1F48A} 病気の生き物をクリック！',
     'click_wake': '\u{23F0} 眠っている生き物をクリック！',
     'add_agent': '+ エージェント',
+    'health_report': 'コード健康度',
+    'total_lines': '行数',
+    'avg_level': '平均Lv',
+    'healthy': '健康',
+    'fat_files': '肥大',
+    'abandoned': '放置',
   },
 };
 
