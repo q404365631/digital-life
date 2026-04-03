@@ -547,16 +547,20 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
     vscode.postMessage({ type: 'addAgent', agentType: 'claude' });
     return;
   }
-  // Number keys 1-9: switch to agent by index
-  if (event.key >= '1' && event.key <= '9') {
-    const idx = parseInt(event.key) - 1;
-    if (idx < agents.length) {
-      const agent = agents[idx];
-      selectedAgentId = agent.id;
-      renderer.setSelectedAgentId(agent.id);
-      soundEngine.playSelectAgent();
-      vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
-    }
+  // Number keys: 1=addAgent test, 2=selectAgent test
+  if (event.key === '1') {
+    // TEST: send addAgent (known working type)
+    vscode.postMessage({ type: 'addAgent', agentType: 'claude' });
+    return;
+  }
+  if (event.key === '2' && agents.length > 0) {
+    // TEST: send selectAgent (suspected broken type)
+    vscode.postMessage({ type: 'selectAgent', agentId: agents[0].id });
+    return;
+  }
+  if (event.key === '3' && agents.length > 0) {
+    // TEST: send stopAgent (another agent message type)
+    vscode.postMessage({ type: 'stopAgent', agentId: agents[0].id });
     return;
   }
 
