@@ -61,7 +61,7 @@ let zoomLevel = 1.0;
 let panX = 0;
 let panY = 0;
 let isPanning = false;
-type ActionMode = 'none' | 'feed' | 'diet' | 'cure' | 'wake';
+type ActionMode = 'none' | 'feed' | 'care';
 let actionMode: ActionMode = 'none';
 let panStartX = 0;
 let panStartY = 0;
@@ -300,13 +300,14 @@ canvas.addEventListener('contextmenu', (event: Event) => {
 // UI elements (toolbar - separate from canvas, no event interference)
 const statusText = document.getElementById('status-text');
 const btnFeed = document.getElementById('btn-feed');
-const btnDiet = document.getElementById('btn-diet');
-const btnCure = document.getElementById('btn-cure');
-const btnWake = document.getElementById('btn-wake');
+const btnCare = document.getElementById('btn-care');
 const btnMute = document.getElementById('btn-mute');
 const btnLang = document.getElementById('btn-lang');
 const feedIndicator = document.getElementById('feed-mode-indicator');
 const eduMessage = document.getElementById('edu-message');
+
+// AI Action preview state
+let pendingAiAction: { creatureId: string; action: string; description: string } | null = null;
 
 // Message handling
 window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
@@ -354,6 +355,17 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'agentChat': {
       agentChats.set(message.agentId, { message: message.message, timestamp: Date.now() });
+      break;
+    }
+
+    case 'aiActionPreview': {
+      // Show approval UI for AI action
+      pendingAiAction = {
+        creatureId: message.creatureId,
+        action: message.action,
+        description: message.description,
+      };
+      showAiApproval(message.description);
       break;
     }
   }
@@ -437,9 +449,7 @@ document.addEventListener('keyup', (event: KeyboardEvent) => {
 
 // Button handlers (toolbar buttons - completely outside canvas, no event interference)
 btnFeed?.addEventListener('click', () => setActionMode(actionMode === 'feed' ? 'none' : 'feed'));
-btnDiet?.addEventListener('click', () => setActionMode(actionMode === 'diet' ? 'none' : 'diet'));
-btnCure?.addEventListener('click', () => setActionMode(actionMode === 'cure' ? 'none' : 'cure'));
-btnWake?.addEventListener('click', () => setActionMode(actionMode === 'wake' ? 'none' : 'wake'));
+btnCare?.addEventListener('click', () => setActionMode(actionMode === 'care' ? 'none' : 'care'));
 
 btnMute?.addEventListener('click', () => {
   const newMuted = !soundEngine.isMuted();
@@ -480,14 +490,10 @@ btnLang?.addEventListener('click', () => {
   }
   // Update toolbar button labels for new language
   const btnFeedEl = document.getElementById('btn-feed');
-  const btnDietEl = document.getElementById('btn-diet');
-  const btnCureEl = document.getElementById('btn-cure');
-  const btnWakeEl = document.getElementById('btn-wake');
+  const btnCareEl = document.getElementById('btn-care');
   const btnAddAgentEl = document.getElementById('btn-add-agent');
   if (btnFeedEl) { btnFeedEl.textContent = `\u{1F35E} ${t('feed_label')}`; }
-  if (btnDietEl) { btnDietEl.textContent = `\u{1F52A} ${t('diet_label')}`; }
-  if (btnCureEl) { btnCureEl.textContent = `\u{1F48A} ${t('cure_label')}`; }
-  if (btnWakeEl) { btnWakeEl.textContent = `\u{23F0} ${t('wake_label')}`; }
+  if (btnCareEl) { btnCareEl.textContent = `\u{1FA7A} ${t('care_label')}`; }
   if (btnAddAgentEl) { btnAddAgentEl.textContent = t('add_agent'); }
   vscode.setState({ ...(vscode.getState() as object ?? {}), language: newLang });
 });
@@ -534,26 +540,21 @@ function setActionMode(mode: ActionMode): void {
   actionMode = mode;
   // Reset active class on all buttons
   btnFeed?.classList.toggle('active', mode === 'feed');
-  btnDiet?.classList.toggle('active', mode === 'diet');
-  btnCure?.classList.toggle('active', mode === 'cure');
-  btnWake?.classList.toggle('active', mode === 'wake');
+  btnCare?.classList.toggle('active', mode === 'care');
   canvas.classList.toggle('feed-mode', mode !== 'none');
 
   if (feedIndicator) {
     feedIndicator.classList.toggle('hidden', mode === 'none');
     if (mode === 'feed') {
       feedIndicator.textContent = t('click_feed');
-    } else if (mode === 'diet') {
-      feedIndicator.textContent = t('click_diet');
-    } else if (mode === 'cure') {
-      feedIndicator.textContent = t('click_cure');
-    } else if (mode === 'wake') {
-      feedIndicator.textContent = t('click_wake');
+    } else if (mode === 'care') {
+      feedIndicator.textContent = t('click_care');
     }
   }
 
-  // Clear education message
+  // Clear education message and pending approval
   hideEduMessage();
+  hideAiApproval();
 }
 
 let eduMessageTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -583,9 +584,6 @@ function hideEduMessage(): void {
 }
 
 function handleAction(mode: ActionMode, creature: CreatureData): void {
-  const health = creature.fileHealth ?? { lineCount: 0, bugCount: 0, lastModified: Date.now() };
-  const daysSince = Math.floor((Date.now() - health.lastModified) / (1000 * 60 * 60 * 24));
-
   switch (mode) {
     case 'feed':
       vscode.postMessage({ type: 'action', action: 'feed', targetId: creature.id });
@@ -594,44 +592,77 @@ function handleAction(mode: ActionMode, creature: CreatureData): void {
       showEduMessage(t('feed_msg'));
       break;
 
-    case 'diet':
-      if (health.lineCount > 300) {
-        vscode.postMessage({ type: 'heal', action: 'diet', targetId: creature.id });
-        soundEngine.playFeed();
-        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
-        showEduMessage(t('diet_msg', { lines: health.lineCount }));
-      } else {
-        showEduMessage(t('diet_wrong', { lines: health.lineCount }), true);
-        soundEngine.playPet();
-      }
-      break;
-
-    case 'cure':
-      if (health.bugCount > 0) {
-        vscode.postMessage({ type: 'heal', action: 'cure', targetId: creature.id });
-        soundEngine.playFeed();
-        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
-        showEduMessage(t('cure_msg', { bugs: health.bugCount }));
-      } else {
-        showEduMessage(t('cure_wrong'), true);
-        soundEngine.playPet();
-      }
-      break;
-
-    case 'wake':
-      if (daysSince >= 3) {
-        vscode.postMessage({ type: 'heal', action: 'wake', targetId: creature.id });
-        soundEngine.playFeed();
-        renderer.triggerFeedEffect(creature.position.x, creature.position.y);
-        showEduMessage(t('wake_msg', { days: daysSince }));
-      } else {
-        showEduMessage(t('wake_wrong'), true);
-        soundEngine.playPet();
-      }
+    case 'care':
+      // Send care request — extension will auto-diagnose and send back aiActionPreview
+      vscode.postMessage({ type: 'care', targetId: creature.id });
+      soundEngine.playPet();
+      showEduMessage(t('care_diagnosing'));
       break;
   }
 
   selectedCreatureId = creature.id;
+}
+
+// AI Action approval UI
+function showAiApproval(description: string): void {
+  if (eduMessage) {
+    eduMessage.textContent = `🩺 ${description}`;
+    eduMessage.classList.remove('hidden', 'wrong');
+
+    // Create approve/cancel buttons if not exist
+    let approveBtn = document.getElementById('btn-approve-ai');
+    let cancelBtn = document.getElementById('btn-cancel-ai');
+
+    if (!approveBtn) {
+      approveBtn = document.createElement('button');
+      approveBtn.id = 'btn-approve-ai';
+      approveBtn.className = 'tool-btn';
+      approveBtn.style.cssText = 'margin-left:8px;color:#4CAF50;border-color:#4CAF50;font-size:11px;padding:2px 8px;';
+      approveBtn.textContent = t('approve');
+      approveBtn.addEventListener('click', () => {
+        if (pendingAiAction) {
+          vscode.postMessage({
+            type: 'approveAiAction',
+            creatureId: pendingAiAction.creatureId,
+            action: pendingAiAction.action,
+          });
+          soundEngine.playFeed();
+          const creature = creatures.find(c => c.id === pendingAiAction!.creatureId);
+          if (creature) {
+            renderer.triggerFeedEffect(creature.position.x, creature.position.y);
+          }
+          showEduMessage(t('care_approved'));
+          pendingAiAction = null;
+        }
+        hideAiApproval();
+      });
+      eduMessage.parentElement?.appendChild(approveBtn);
+    }
+
+    if (!cancelBtn) {
+      cancelBtn = document.createElement('button');
+      cancelBtn.id = 'btn-cancel-ai';
+      cancelBtn.className = 'tool-btn';
+      cancelBtn.style.cssText = 'margin-left:4px;color:#EF5350;border-color:#EF5350;font-size:11px;padding:2px 8px;';
+      cancelBtn.textContent = t('cancel');
+      cancelBtn.addEventListener('click', () => {
+        pendingAiAction = null;
+        hideAiApproval();
+        hideEduMessage();
+      });
+      eduMessage.parentElement?.appendChild(cancelBtn);
+    }
+
+    approveBtn.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
+  }
+}
+
+function hideAiApproval(): void {
+  const approveBtn = document.getElementById('btn-approve-ai');
+  const cancelBtn = document.getElementById('btn-cancel-ai');
+  approveBtn?.classList.add('hidden');
+  cancelBtn?.classList.add('hidden');
 }
 
 // Restore saved language preference

@@ -109,14 +109,13 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       const fileName = path.basename(filePath);
       const species = getSpeciesForFile(filePath);
-      const speciesName = SPECIES_DATA[species].name;
-      void promptForName(fileName, speciesName).then((name) => {
-        const creature = creatureManager.spawnCreature(filePath, name, species, currentDNA);
-        if (creature) {
-          panelProvider.postMessage({ type: 'creatureBorn', creature });
-          saveState();
-        }
-      });
+      // Silent auto-spawn — no InputBox interruption
+      const name = fileName.replace(/\.[^.]+$/, '');
+      const creature = creatureManager.spawnCreature(filePath, name, species, currentDNA);
+      if (creature) {
+        panelProvider.postMessage({ type: 'creatureBorn', creature });
+        saveState();
+      }
     },
     onFileChanged: (_filePath: string) => {
       // Bug count is updated via onBugCountChanged
@@ -190,24 +189,64 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'action':
         if (message.action === 'feed') {
           creatureManager.feed(message.targetId);
-          // Also send AI auto-prompt for the file
-          const feedCreature = creatureManager.getById(message.targetId);
-          if (feedCreature) {
-            const aiTerminal = findOrCreateClaudeTerminal();
-            if (aiTerminal.isNew) {
-              setTimeout(() => sendHealCommand(aiTerminal.terminal, 'feed', feedCreature), 3000);
-            } else {
-              aiTerminal.terminal.show();
-              sendHealCommand(aiTerminal.terminal, 'feed', feedCreature);
-            }
-          }
         } else if (message.action === 'pet') {
           creatureManager.pet(message.targetId);
         }
         sendWorldUpdate();
         saveState();
         break;
+      case 'care': {
+        // AI auto-diagnoses the best action for this creature
+        const careCreature = creatureManager.getById(message.targetId);
+        if (careCreature) {
+          const health = careCreature.fileHealth;
+          const daysSince = (Date.now() - health.lastModified) / (1000 * 60 * 60 * 24);
+
+          let action: string;
+          let description: string;
+          if (health.bugCount > 0) {
+            action = 'cure';
+            description = `${health.bugCount}件のバグを修正します (TODO, console.log, any型)`;
+          } else if (health.lineCount > 300) {
+            action = 'diet';
+            description = `${health.lineCount}行 → 200行以下にリファクタリングします`;
+          } else if (daysSince > 3) {
+            action = 'wake';
+            description = `${Math.floor(daysSince)}日間放置 → レビューして最新化します`;
+          } else {
+            action = 'feed';
+            description = 'コードを最適化して可読性を向上させます';
+          }
+
+          // Send preview to Webview for user approval
+          panelProvider.postMessage({
+            type: 'aiActionPreview',
+            creatureId: careCreature.id,
+            action,
+            description,
+          });
+        }
+        break;
+      }
+      case 'approveAiAction': {
+        // User approved the AI action — now execute
+        const approvedCreature = creatureManager.getById(message.creatureId);
+        if (approvedCreature) {
+          const aiTerminal = findOrCreateClaudeTerminal();
+          if (aiTerminal.isNew) {
+            setTimeout(() => sendHealCommand(aiTerminal.terminal, message.action, approvedCreature), 3000);
+          } else {
+            aiTerminal.terminal.show();
+            sendHealCommand(aiTerminal.terminal, message.action, approvedCreature);
+          }
+          creatureManager.feed(message.creatureId);
+          sendWorldUpdate();
+          saveState();
+        }
+        break;
+      }
       case 'heal': {
+        // Legacy direct heal (kept for backward compat but now prefer care → approve flow)
         const healCreature = creatureManager.getById(message.targetId);
         if (healCreature) {
           const aiTerminal = findOrCreateClaudeTerminal();
@@ -644,14 +683,6 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   }
 
-  async function promptForName(fileName: string, speciesName: string = 'creature'): Promise<string> {
-    const name = await vscode.window.showInputBox({
-      prompt: `A ${speciesName} is born from "${fileName}"! Give it a name:`,
-      placeHolder: 'Name your creature...',
-      value: fileName.replace(/\.[^.]+$/, ''),
-    });
-    return name ?? fileName.replace(/\.[^.]+$/, '');
-  }
 }
 
 export function deactivate(): void {

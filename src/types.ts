@@ -122,12 +122,15 @@ export type ExtToWebMessage =
   | { readonly type: 'creatureDied'; readonly creatureId: string }
   | { readonly type: 'commitDetected' }
   | { readonly type: 'bugCountChanged'; readonly count: number }
-  | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string };
+  | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string }
+  | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string };
 
 export type WebToExtMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'action'; readonly action: 'pet' | 'feed'; readonly targetId: string }
   | { readonly type: 'heal'; readonly action: 'diet' | 'cure' | 'wake' | 'feed'; readonly targetId: string }
+  | { readonly type: 'care'; readonly targetId: string }
+  | { readonly type: 'approveAiAction'; readonly creatureId: string; readonly action: string }
   | { readonly type: 'nameCreature'; readonly creatureId: string; readonly name: string }
   | { readonly type: 'moveCreature'; readonly creatureId: string; readonly position: Position }
   | { readonly type: 'addAgent'; readonly agentType: AgentType }
