@@ -94,7 +94,7 @@ export class SpriteRenderer {
     return true;
   }
 
-  renderCreature(creature: CreatureData): void {
+  renderCreature(creature: CreatureData, isSelected: boolean = false): void {
     const sheetKey = `creature_${creature.species}_sheet`;
     const actionsKey = `creature_${creature.species}_actions`;
 
@@ -197,43 +197,79 @@ export class SpriteRenderer {
       return;
     }
 
-    // Name label with level badge
+    // Level badge (always visible) + name & path (selected only)
     if (creature.stage !== 'egg') {
-      this.ctx.save();
-      const nameX = creature.position.x;
-      const nameY = creature.position.y - renderSize / 2 - 8;
-
-      // Level badge
-      const lvText = `Lv.${creature.level}`;
-      this.ctx.font = 'bold 7px sans-serif';
-      const lvWidth = this.ctx.measureText(lvText).width;
-
-      // Name
-      this.ctx.font = 'bold 10px sans-serif';
-      this.ctx.textAlign = 'center';
-      const nameWidth = this.ctx.measureText(creature.name).width;
-
-      const totalWidth = nameWidth + lvWidth + 10;
-
-      // Background pill
-      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      this.ctx.beginPath();
-      this.ctx.roundRect(nameX - totalWidth / 2 - 2, nameY - 9, totalWidth + 4, 13, 4);
-      this.ctx.fill();
-
-      // Name text
-      this.ctx.fillStyle = '#FFFFFF';
-      this.ctx.font = 'bold 10px sans-serif';
-      this.ctx.fillText(creature.name, nameX - lvWidth / 2 - 2, nameY);
-
-      // Level text (colored by stage)
+      const cx = creature.position.x;
+      const baseY = creature.position.y - renderSize / 2 - 6;
       const lvColor = isAdult ? '#FFD700' : creature.stage === 'baby' ? '#90CAF9' : '#AAAAAA';
-      this.ctx.fillStyle = lvColor;
-      this.ctx.font = 'bold 7px sans-serif';
-      this.ctx.textAlign = 'left';
-      this.ctx.fillText(lvText, nameX + nameWidth / 2 - lvWidth / 2 + 2, nameY);
 
-      this.ctx.restore();
+      if (isSelected) {
+        // ── Selected: name + Lv + file path ──
+        this.ctx.save();
+
+        // Name + Lv line
+        const lvText = `Lv.${creature.level}`;
+        this.ctx.font = 'bold 9px sans-serif';
+        const nameW = this.ctx.measureText(creature.name).width;
+        this.ctx.font = 'bold 7px sans-serif';
+        const lvW = this.ctx.measureText(lvText).width;
+        const rowW = nameW + lvW + 6;
+
+        this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(cx - rowW / 2 - 4, baseY - 10, rowW + 8, 13, 4);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = 'bold 9px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(creature.name, cx - lvW / 2, baseY);
+
+        this.ctx.fillStyle = lvColor;
+        this.ctx.font = 'bold 7px sans-serif';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(lvText, cx + nameW / 2 - lvW / 2 + 3, baseY);
+
+        // File path line (shortened)
+        const fullPath = creature.sourceFile;
+        const shortPath = fullPath.split('/').slice(-2).join('/');
+        this.ctx.font = '7px sans-serif';
+        this.ctx.textAlign = 'center';
+        const pathW = this.ctx.measureText(shortPath).width;
+
+        this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#90CAF9';
+        this.ctx.fillText(shortPath, cx, baseY - 13);
+
+        // Selection ring
+        this.ctx.strokeStyle = 'rgba(255,215,0,0.6)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.arc(creature.position.x, creature.position.y, renderSize / 2 + 3, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        this.ctx.restore();
+      } else {
+        // ── Default: tiny Lv badge only ──
+        this.ctx.save();
+        const lvText = `${creature.level}`;
+        this.ctx.font = 'bold 7px sans-serif';
+        const lvW = this.ctx.measureText(lvText).width;
+
+        this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(cx - lvW / 2 - 3, baseY - 8, lvW + 6, 10, 3);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = lvColor;
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(lvText, cx, baseY);
+        this.ctx.restore();
+      }
     }
 
     // Reaction effects

@@ -142,7 +142,8 @@ export type WebToExtMessage =
   | { readonly type: 'selectAgent'; readonly agentId: string }
   | { readonly type: 'sitAgent'; readonly agentId: string; readonly sitting: boolean }
   | { readonly type: 'deleteAgent'; readonly agentId: string }
-  | { readonly type: 'clearAllCreatures' };
+  | { readonly type: 'clearAllCreatures' }
+  | { readonly type: 'revealFile'; readonly creatureId: string };
 
 // --- Agent ---
 

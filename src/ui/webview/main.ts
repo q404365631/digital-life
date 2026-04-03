@@ -402,6 +402,8 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 
   if (targetId) {
     selectedCreatureId = targetId;
+    // Reveal this creature's file in the editor
+    vscode.postMessage({ type: 'revealFile', creatureId: targetId });
     return;
   }
 

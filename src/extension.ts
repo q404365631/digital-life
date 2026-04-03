@@ -326,6 +326,14 @@ export function activate(context: vscode.ExtensionContext): void {
         saveState();
         break;
       }
+      case 'revealFile': {
+        const revealCreature = creatureManager.getById(message.creatureId);
+        if (revealCreature) {
+          const uri = vscode.Uri.file(revealCreature.sourceFile);
+          void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+        }
+        break;
+      }
       case 'clearAllCreatures': {
         creatureManager.loadCreatures([]);
         sendWorldUpdate();

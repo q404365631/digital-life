@@ -76,14 +76,13 @@ export class GameRenderer {
 
     // Draw creatures
     for (const creature of creatures) {
+      const selected = creature.id === selectedCreatureId;
       if (creature.id === draggingCreatureId) {
-        // Dragging: float up and scale up for "picked up" effect
         this.ctx.save();
         this.ctx.translate(creature.position.x, creature.position.y);
         this.ctx.scale(1.2, 1.2);
         this.ctx.translate(-creature.position.x, -creature.position.y - 4);
-        this.spriteRenderer.renderCreature(creature);
-        // Draw shadow under dragged creature
+        this.spriteRenderer.renderCreature(creature, true);
         this.ctx.globalAlpha = 0.3;
         this.ctx.fillStyle = '#000000';
         this.ctx.beginPath();
@@ -91,7 +90,7 @@ export class GameRenderer {
         this.ctx.fill();
         this.ctx.restore();
       } else {
-        this.spriteRenderer.renderCreature(creature);
+        this.spriteRenderer.renderCreature(creature, selected);
       }
     }
 
