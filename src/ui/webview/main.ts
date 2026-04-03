@@ -542,6 +542,11 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 document.addEventListener('keydown', (event: KeyboardEvent) => {
   keysPressed.add(event.key);
 
+  // DEBUG: Press 0 to add agent (tests if postMessage works from keyboard)
+  if (event.key === '0') {
+    vscode.postMessage({ type: 'addAgent', agentType: 'claude' });
+    return;
+  }
   // Number keys 1-9: switch to agent by index
   if (event.key >= '1' && event.key <= '9') {
     const idx = parseInt(event.key) - 1;
