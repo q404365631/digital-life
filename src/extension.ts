@@ -17,14 +17,12 @@ const AGENT_NAMES: Record<string, string> = {
   claude: 'Claude',
   cursor: 'Cursor',
   copilot: 'Copilot',
-  custom: 'Agent',
 };
 
 const AGENT_TERMINAL_CMDS: Record<string, string> = {
   claude: 'claude',
   cursor: 'echo "Cursor AI is running in the editor"',
   copilot: 'echo "GitHub Copilot is running in the editor"',
-  custom: '',
 };
 
 function agentTerminalName(name: string): string {
@@ -49,7 +47,10 @@ export function activate(context: vscode.ExtensionContext): void {
     creatureManager.loadCreatures(savedState.creatures);
     worldState = savedState.world;
     if (savedState.agents) {
-      agentManager.loadAgents(savedState.agents);
+      // Filter out agents with invalid/removed types
+      const validTypes = new Set(['claude', 'cursor', 'copilot']);
+      const validAgents = savedState.agents.filter(a => validTypes.has(a.agentType));
+      agentManager.loadAgents(validAgents);
     }
   } else {
     worldState = createInitialWorldState();

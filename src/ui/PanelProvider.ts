@@ -152,7 +152,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
         <button id="btn-diet" class="tool-btn" title="Diet - Split large files">&#x1F52A; Diet</button>
         <button id="btn-cure" class="tool-btn" title="Cure - Fix bugs">&#x1F48A; Cure</button>
         <button id="btn-wake" class="tool-btn" title="Wake - Review old files">&#x23F0; Wake</button>
-        <button id="btn-room" class="tool-btn" title="Change Room">&#x1F3E0; Room 1</button>
         <button id="btn-lang" class="tool-btn" title="Language">&#x1F310; EN</button>
         <button id="btn-mute" class="tool-btn" title="Mute">&#x1F50A;</button>
         <button id="btn-delete" class="tool-btn" title="Delete selected" style="color:#EF5350;border-color:#EF5350;">&#x1F5D1;</button>

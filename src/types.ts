@@ -143,7 +143,7 @@ export type WebToExtMessage =
 
 // --- Agent ---
 
-export type AgentType = 'claude' | 'cursor' | 'copilot' | 'custom';
+export type AgentType = 'claude' | 'cursor' | 'copilot';
 export type AgentStatus = 'idle' | 'running' | 'generating' | 'error' | 'done';
 
 export interface AgentData {

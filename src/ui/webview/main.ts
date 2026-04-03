@@ -450,7 +450,7 @@ btnMute?.addEventListener('click', () => {
 
 const btnAddAgent = document.getElementById('btn-add-agent');
 btnAddAgent?.addEventListener('click', () => {
-  const types: AgentType[] = ['claude', 'cursor', 'copilot', 'custom'];
+  const types: AgentType[] = ['claude', 'cursor', 'copilot'];
   const nextType = types[agents.length % types.length];
   vscode.postMessage({ type: 'addAgent', agentType: nextType });
 });
@@ -469,26 +469,6 @@ btnClearAll?.addEventListener('click', () => {
   vscode.postMessage({ type: 'clearAllCreatures' });
   selectedCreatureId = null;
 });
-
-const roomNames = ['Room 1', 'Room 2', 'Room 3'];
-const btnRoom = document.getElementById('btn-room');
-btnRoom?.addEventListener('click', () => {
-  const next = (renderer.getBgIndex() + 1) % 3;
-  renderer.setBgIndex(next);
-  if (btnRoom) {
-    btnRoom.textContent = `\u{1F3E0} ${roomNames[next]}`;
-  }
-  vscode.setState({ ...(vscode.getState() as object ?? {}), roomIndex: next });
-});
-
-// Restore saved room
-const savedRoom = (vscode.getState() as { roomIndex?: number } | null)?.roomIndex;
-if (savedRoom !== undefined && savedRoom !== null) {
-  renderer.setBgIndex(savedRoom);
-  if (btnRoom) {
-    btnRoom.textContent = `\u{1F3E0} ${roomNames[savedRoom]}`;
-  }
-}
 
 btnLang?.addEventListener('click', () => {
   const newLang: Language = getLanguage() === 'en' ? 'ja' : 'en';
