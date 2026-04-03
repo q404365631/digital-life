@@ -191,7 +191,6 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: '\u26A1 Claude Code', description: 'Anthropic Claude', value: 'claude' as AgentType },
             { label: '\uD83D\uDDB1\uFE0F Cursor AI', description: 'Cursor Editor AI', value: 'cursor' as AgentType },
             { label: '\uD83E\uDD16 GitHub Copilot', description: 'GitHub Copilot', value: 'copilot' as AgentType },
-            { label: '\u2699\uFE0F Custom Agent', description: 'Custom terminal command', value: 'custom' as AgentType },
           ], { placeHolder: 'Select AI Agent to add' });
           if (!pick) { return; }
           const agentType = pick.value;

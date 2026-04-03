@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ExtToWebMessage, WebToExtMessage } from '../types';
 
 export class PanelProvider implements vscode.WebviewViewProvider {
@@ -16,7 +18,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
-    // Dispose previous listeners before re-registering
     for (const d of this.listenerDisposables) {
       d.dispose();
     }
@@ -26,10 +27,6 @@ export class PanelProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview'),
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites'),
-      ],
     };
 
     webviewView.webview.html = this.getHtml(webviewView.webview);
@@ -75,37 +72,46 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private getHtml(webview: vscode.Webview): string {
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'main.js')
-    );
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'styles.css')
-    );
+  /** Read a PNG file and return as data:image/png;base64,... URI */
+  private toDataUri(filePath: string): string {
+    try {
+      const data = fs.readFileSync(filePath);
+      return `data:image/png;base64,${data.toString('base64')}`;
+    } catch {
+      return '';
+    }
+  }
+
+  private getHtml(_webview: vscode.Webview): string {
+    const spritesDir = path.join(this.extensionUri.fsPath, 'dist', 'sprites');
+
+    // Read JS/CSS from disk and inline them to eliminate caching
+    const jsPath = path.join(this.extensionUri.fsPath, 'dist', 'webview', 'main.js');
+    const cssPath = path.join(this.extensionUri.fsPath, 'dist', 'webview', 'styles.css');
+
+    let inlineJs = '';
+    let inlineCss = '';
+    try { inlineJs = fs.readFileSync(jsPath, 'utf8'); } catch { /* */ }
+    try { inlineCss = fs.readFileSync(cssPath, 'utf8'); } catch { /* */ }
+
     const nonce = getNonce();
 
+    // Creature sprites as Base64 data URIs (sheet + actions)
     const creatureSprites: Record<string, { sheet: string; actions: string }> = {};
     const species = ['dot', 'puff', 'chomp', 'blob', 'pip', 'wisp'];
     for (const s of species) {
       creatureSprites[s] = {
-        sheet: webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `creature_${s}_sheet.png`)
-        ).toString(),
-        actions: webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `creature_${s}_actions.png`)
-        ).toString(),
+        sheet: this.toDataUri(path.join(spritesDir, `creature_${s}_sheet.png`)),
+        actions: this.toDataUri(path.join(spritesDir, `creature_${s}_actions.png`)),
       };
     }
 
+    // Agent sprites as Base64 data URIs (3 agents only)
     const agentSprites: Record<string, { sheet: string; actions: string }> = {};
     for (let i = 0; i < 3; i++) {
       agentSprites[String(i)] = {
-        sheet: webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_sheet.png`)
-        ).toString(),
-        actions: webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_actions.png`)
-        ).toString(),
+        sheet: this.toDataUri(path.join(spritesDir, `agent_${i}_sheet.png`)),
+        actions: this.toDataUri(path.join(spritesDir, `agent_${i}_actions.png`)),
       };
     }
 
@@ -114,8 +120,8 @@ export class PanelProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource};">
-  <link rel="stylesheet" href="${styleUri}">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src data:;">
+  <style nonce="${nonce}">${inlineCss}</style>
   <title>Digital Life</title>
 </head>
 <body>
@@ -150,7 +156,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       </div>
     </div>
   </div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <script nonce="${nonce}">${inlineJs}</script>
 </body>
 </html>`;
   }
