@@ -1,4 +1,5 @@
 import { CreatureData, AgentData, SpriteData, ColorPalette, GraveStone } from '../../../types';
+import { t } from '../i18n';
 // Default palette for sprite cache key generation (formerly in PuffSprites.ts)
 const DEFAULT_PALETTE: ColorPalette = [
   'transparent', '#1A1A1A', '#333333', '#0D0D0D', '#FFFFFF', '#000000', '#4A4A4A',
@@ -242,6 +243,72 @@ export class SpriteRenderer {
 
     // File health effects
     this.renderHealthEffects(creature, renderSize);
+
+    // Speech bubble — creatures speak through feelings, not numbers
+    this.renderSpeechBubble(creature, renderSize);
+  }
+
+  /**
+   * Creatures periodically say how they feel.
+   * Visible 2 seconds every 8 seconds, staggered by creature id hash.
+   */
+  private renderSpeechBubble(creature: CreatureData, renderSize: number): void {
+    if (creature.stage === 'egg') return;
+    if (creature.reactionTimer > 0) return; // reaction effect takes priority
+
+    // Stagger: each creature gets a different phase so they don't all talk at once
+    const hash = creature.id.charCodeAt(creature.id.length - 1) ?? 0;
+    const cycle = 8000; // 8-second cycle
+    const phase = (Date.now() + hash * 307) % cycle;
+    if (phase > 2000) return; // visible for first 2s of each cycle
+
+    const msg = this.getCreatureMood(creature);
+    if (!msg) return;
+
+    const alpha = phase < 300 ? phase / 300 :
+                  phase > 1700 ? (2000 - phase) / 300 : 1;
+
+    this.ctx.save();
+    this.ctx.globalAlpha = alpha * 0.9;
+
+    const bx = creature.position.x;
+    const by = creature.position.y - renderSize / 2 - 22;
+
+    this.ctx.font = '8px sans-serif';
+    const tw = this.ctx.measureText(msg).width;
+    const pad = 4;
+
+    // Bubble background
+    this.ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    this.ctx.beginPath();
+    this.ctx.roundRect(bx - tw / 2 - pad, by - 10, tw + pad * 2, 14, 4);
+    this.ctx.fill();
+
+    // Tiny triangle
+    this.ctx.beginPath();
+    this.ctx.moveTo(bx - 3, by + 4);
+    this.ctx.lineTo(bx, by + 8);
+    this.ctx.lineTo(bx + 3, by + 4);
+    this.ctx.fill();
+
+    // Text
+    this.ctx.fillStyle = '#333';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(msg, bx, by);
+
+    this.ctx.restore();
+  }
+
+  private getCreatureMood(creature: CreatureData): string | null {
+    const h = creature.fileHealth;
+    const stale = (Date.now() - h.lastModified) / 864e5;
+
+    if (creature.hunger < 20)   return t('bubble_hungry');
+    if (h.bugCount > 2)         return t('bubble_sick');
+    if (h.lineCount > 400)      return t('bubble_heavy');
+    if (stale > 5)              return t('bubble_sleepy');
+    if (creature.happiness > 70 && h.bugCount === 0) return t('bubble_happy');
+    return null;
   }
 
   private renderHealthEffects(creature: CreatureData, renderSize: number): void {

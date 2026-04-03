@@ -5,7 +5,7 @@ import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
 import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone } from './world/WorldState';
-import { getSpeciesForFile, SPECIES_DATA } from './creature/SpeciesData';
+import { getSpeciesForFile } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
 import { MAX_CREATURES } from './constants';
@@ -63,22 +63,23 @@ export function activate(context: vscode.ExtensionContext): void {
     const all = creatureManager.getAll();
     const count = all.length;
     const hungry = all.filter(c => c.stage !== 'egg' && c.hunger < 30).length;
-    const totalLevel = all.reduce((sum, c) => sum + c.level, 0);
-    const avgLevel = count > 0 ? (totalLevel / count).toFixed(1) : '0';
+    const sick = all.filter(c => c.fileHealth.bugCount > 0).length;
 
-    let icon = '\uD83D\uDC23'; // hatching chick
-    if (hungry > 0) {
-      icon = '\uD83D\uDE2D'; // crying - someone is hungry
-    } else if (count > 0) {
-      icon = '\uD83D\uDC9A'; // green heart - all healthy
+    if (count === 0) {
+      statusBarItem.text = 'Digital Life';
+      statusBarItem.tooltip = 'Click to adopt files as friends';
+      return;
     }
 
-    statusBarItem.text = `${icon} ${count} lives | Lv.${avgLevel}`;
+    // Emotional status — the most urgent feeling wins
     if (hungry > 0) {
-      statusBarItem.tooltip = `Digital Life: ${hungry} creature(s) hungry! Click to manage.`;
+      statusBarItem.text = `${count} friends -- ${hungry} hungry`;
+    } else if (sick > 0) {
+      statusBarItem.text = `${count} friends -- ${sick} not well`;
     } else {
-      statusBarItem.tooltip = `Digital Life: ${count} creatures, Avg Lv.${avgLevel}`;
+      statusBarItem.text = `${count} friends -- all good`;
     }
+    statusBarItem.tooltip = `Digital Life: ${count} friends`;
   }
 
   updateStatusBar();

@@ -126,7 +126,7 @@ export class GameRenderer {
     if (selectedCreatureId) {
       const selectedCreature = creatures.find(c => c.id === selectedCreatureId);
       if (selectedCreature && selectedCreature.dna) {
-        this.uiRenderer.renderDNAPanel(selectedCreature.dna);
+        this.uiRenderer.renderPersonality(selectedCreature.dna);
       }
     }
 

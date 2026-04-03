@@ -137,16 +137,14 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="toolbar">
       <div id="toolbar-left">
-        <span id="status-text">Lives: 0</span>
-        <button id="btn-add-agent" class="tool-btn agent-btn" title="Add AI Agent">+ Agent</button>
+        <span id="status-text"></span>
       </div>
       <div id="toolbar-center">
-        <button id="btn-feed" class="tool-btn" title="Feed">&#x1F35E; Feed</button>
-        <button id="btn-care" class="tool-btn" title="Care - AI auto-diagnoses and heals">&#x1FA7A; Care</button>
-        <button id="btn-lang" class="tool-btn" title="Language">&#x1F310; EN</button>
-        <button id="btn-mute" class="tool-btn" title="Mute">&#x1F50A;</button>
-        <button id="btn-delete" class="tool-btn" title="Delete selected" style="color:#EF5350;border-color:#EF5350;">&#x1F5D1;</button>
-        <button id="btn-clear-all" class="tool-btn" title="Clear all creatures" style="color:#FF7043;border-color:#FF7043;">&#x1F9F9;</button>
+        <button id="btn-feed"      class="tool-btn" title="Feed"></button>
+        <button id="btn-care"      class="tool-btn" title="Care"></button>
+        <button id="btn-add-agent" class="tool-btn" title="Helper"></button>
+        <button id="btn-lang"      class="tool-btn" title="Language">EN</button>
+        <button id="btn-mute"      class="tool-btn" title="Sound"></button>
       </div>
       <div id="toolbar-right">
         <span id="feed-mode-indicator" class="hidden"></span>

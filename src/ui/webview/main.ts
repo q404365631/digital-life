@@ -2,7 +2,7 @@ import { ExtToWebMessage, WebToExtMessage, CreatureData, AgentData, AgentType, W
 import { CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_DURATION } from '../../constants';
 import { GameRenderer } from './renderer/GameRenderer';
 import { SoundEngine } from './audio/SoundEngine';
-import { setLanguage, getLanguage, Language, t } from './i18n';
+import { setLanguage, getLanguage, nextLanguage, langLabel, Language, t } from './i18n';
 
 // VSCode API
 interface VSCodeApi {
@@ -467,36 +467,26 @@ btnAddAgent?.addEventListener('click', () => {
   vscode.postMessage({ type: 'addAgent', agentType: nextType });
 });
 
-const btnDelete = document.getElementById('btn-delete');
-btnDelete?.addEventListener('click', () => {
-  if (selectedAgentId) {
-    vscode.postMessage({ type: 'deleteAgent', agentId: selectedAgentId });
-    selectedAgentId = null;
-    renderer.setSelectedAgentId(null);
-  }
-});
-
-const btnClearAll = document.getElementById('btn-clear-all');
-btnClearAll?.addEventListener('click', () => {
-  vscode.postMessage({ type: 'clearAllCreatures' });
-  selectedCreatureId = null;
-});
+// Delete agent: long-press on selected agent (or via command palette)
+// Clear all: available through command palette "digitalLife.resetAll"
 
 btnLang?.addEventListener('click', () => {
-  const newLang: Language = getLanguage() === 'en' ? 'ja' : 'en';
+  const newLang = nextLanguage();
   setLanguage(newLang);
-  if (btnLang) {
-    btnLang.textContent = newLang === 'en' ? '\u{1F310} EN' : '\u{1F310} JP';
-  }
-  // Update toolbar button labels for new language
-  const btnFeedEl = document.getElementById('btn-feed');
-  const btnCareEl = document.getElementById('btn-care');
-  const btnAddAgentEl = document.getElementById('btn-add-agent');
-  if (btnFeedEl) { btnFeedEl.textContent = `\u{1F35E} ${t('feed_label')}`; }
-  if (btnCareEl) { btnCareEl.textContent = `\u{1FA7A} ${t('care_label')}`; }
-  if (btnAddAgentEl) { btnAddAgentEl.textContent = t('add_agent'); }
+  applyToolbarLabels();
   vscode.setState({ ...(vscode.getState() as object ?? {}), language: newLang });
 });
+
+/** Refresh all toolbar labels/tooltips for current language */
+function applyToolbarLabels(): void {
+  const lang = getLanguage();
+  if (btnLang)    { btnLang.textContent = langLabel(lang); btnLang.title = t('tt_lang'); }
+  if (btnFeed)    { btnFeed.title = t('tt_feed'); }
+  if (btnCare)    { btnCare.title = t('tt_care'); }
+  if (btnMute)    { btnMute.title = soundEngine.isMuted() ? t('tt_unmute') : t('tt_mute'); }
+  const addAgent = document.getElementById('btn-add-agent');
+  if (addAgent)   { addAgent.title = t('tt_add_agent'); }
+}
 
 // ============================================================
 // Action Mode (click action button -> click creature to act)
@@ -669,10 +659,8 @@ function hideAiApproval(): void {
 const savedLangState = vscode.getState() as { language?: Language } | null;
 if (savedLangState?.language) {
   setLanguage(savedLangState.language);
-  if (btnLang) {
-    btnLang.textContent = savedLangState.language === 'en' ? '\u{1F310} EN' : '\u{1F310} JP';
-  }
 }
+applyToolbarLabels();
 
 // Game loop
 let lastTime = 0;
