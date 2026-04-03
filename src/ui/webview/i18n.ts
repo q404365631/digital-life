@@ -36,6 +36,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          'Sound',
     tt_unmute:        'Sound',
     tt_add_agent:     'Agent',
+    tt_lineup:        'Roll call',
     tt_delete:        'Say goodbye',
     tt_clear:         'Start over',
 
@@ -94,6 +95,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          'おと',
     tt_unmute:        'おと',
     tt_add_agent:     'エージェント',
+    tt_lineup:        'せいれつ',
     tt_delete:        'おわかれ',
     tt_clear:         'やりなおす',
 
@@ -148,6 +150,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          '聲音',
     tt_unmute:        '聲音',
     tt_add_agent:     '代理',
+    tt_lineup:        '整隊',
     tt_delete:        '告別',
     tt_clear:         '重新開始',
 
@@ -202,6 +205,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          '声音',
     tt_unmute:        '声音',
     tt_add_agent:     '代理',
+    tt_lineup:        '整队',
     tt_delete:        '告别',
     tt_clear:         '重新开始',
 
@@ -256,6 +260,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          '소리',
     tt_unmute:        '소리',
     tt_add_agent:     '에이전트',
+    tt_lineup:        '정렬',
     tt_delete:        '안녕히',
     tt_clear:         '처음부터',
 
@@ -310,6 +315,7 @@ const dict: Record<Language, Dict> = {
     tt_mute:          'Sonido',
     tt_unmute:        'Sonido',
     tt_add_agent:     'Agente',
+    tt_lineup:        'Formar',
     tt_delete:        'Despedirse',
     tt_clear:         'Empezar de nuevo',
 

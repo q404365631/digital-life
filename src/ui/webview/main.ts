@@ -331,13 +331,10 @@ let friendshipPairs: readonly { a: string; b: string }[] = [];
 // ── Lineup (点呼) ───────────────────────────────────────────
 let lineupActive = false;
 
-// Trigger: click on status text ("Lives: N")
-statusText?.addEventListener('click', () => {
+const btnLineup = document.getElementById('btn-lineup');
+btnLineup?.addEventListener('click', () => {
   vscode.postMessage({ type: 'lineup' });
 });
-if (statusText) {
-  statusText.style.cursor = 'pointer';
-}
 
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
@@ -596,6 +593,7 @@ function applyToolbarLabels(): void {
   if (btnMute)    { const m = soundEngine.isMuted(); btnMute.textContent = m ? t('tt_unmute') : t('tt_mute'); btnMute.title = m ? t('tt_unmute') : t('tt_mute'); }
   const addAgent = document.getElementById('btn-add-agent');
   if (addAgent)   { addAgent.textContent = '+ ' + t('tt_add_agent'); addAgent.title = t('tt_add_agent'); }
+  if (btnLineup)  { btnLineup.textContent = t('tt_lineup'); btnLineup.title = t('tt_lineup'); }
 }
 
 // ============================================================
