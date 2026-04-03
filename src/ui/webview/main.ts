@@ -156,6 +156,7 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     // Find nearest creature AND agent — pick whichever is closest
     const { id: creatureHit, dist: creatureDist } = findCreatureAtCanvasPosWithDist(worldPos.x, worldPos.y);
     const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);
+    console.log(`[DL-WV] pointerdown: agentHit=${agentHit} (${agentDist.toFixed(1)}), creatureHit=${creatureHit} (${creatureDist.toFixed(1)}), agents.length=${agents.length}`);
 
     // Agent wins tie (larger sprite, harder to miss)
     if (agentHit && agentDist <= creatureDist) {
@@ -286,12 +287,15 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
       vscode.postMessage({ type: 'moveAgent', agentId, position: override });
     } else if (!dragMoved) {
       // Tap (no drag): select agent + switch terminal
+      console.log(`[DL-WV] pointerup TAP: sending clickAgent for ${agentId}`);
       selectedAgentId = agentId;
       renderer.setSelectedAgentId(agentId);
       soundEngine.playSelectAgent();
       vscode.postMessage({ type: 'selectAgent', agentId });
       vscode.postMessage({ type: 'clickAgent', agentId });
       tapHandledByPointerUp = true; // suppress duplicate click event
+    } else {
+      console.log(`[DL-WV] pointerup DRAG: dragMoved=${dragMoved}`);
     }
     dragOverridePositions.delete(agentId);
     draggingAgentId = null;

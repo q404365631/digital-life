@@ -498,10 +498,14 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       }
       case 'clickAgent': {
+        console.log(`[DL] clickAgent received: ${message.agentId}`);
         const agent = agentManager.getById(message.agentId);
+        console.log(`[DL] agent found: ${agent ? agent.name : 'NOT FOUND'}`);
+        console.log(`[DL] agentTerminals keys: ${[...agentTerminals.keys()].join(', ')}`);
         if (agent) {
           const terminal = getAgentTerminal(agent.id, agent.name, agent.agentType);
-          terminal.show(true); // true = preserveFocus: keep focus in webview so next click works
+          console.log(`[DL] terminal name: ${terminal.name}, exitStatus: ${terminal.exitStatus}`);
+          terminal.show(true);
           agentManager.updateStatus(agent.id, 'running');
           sendWorldUpdate();
         }
