@@ -293,23 +293,29 @@ export class SpriteRenderer {
 
   /**
    * Creatures periodically say how they feel.
-   * Visible 2 seconds every 8 seconds, staggered by creature id hash.
+   * Each creature has its own rhythm — cycle length, show duration, and
+   * phase offset are all derived from the creature's id so no two speak
+   * in lockstep.
    */
   private renderSpeechBubble(creature: CreatureData, renderSize: number): void {
     if (creature.stage === 'egg') return;
     if (creature.reactionTimer > 0) return; // reaction effect takes priority
 
-    // Stagger: each creature gets a different phase so they don't all talk at once
-    const hash = creature.id.charCodeAt(creature.id.length - 1) ?? 0;
-    const cycle = 8000; // 8-second cycle
-    const phase = (Date.now() + hash * 307) % cycle;
-    if (phase > 2000) return; // visible for first 2s of each cycle
+    // Two-byte hash from creature id → different personality timing
+    const h0 = creature.id.charCodeAt(creature.id.length - 1) ?? 0;
+    const h1 = creature.id.charCodeAt(creature.id.length - 2) ?? 0;
+    const cycle = 6000 + (h0 % 7) * 1000;           // 6 – 12 s per creature
+    const showDuration = 1500 + (h1 % 5) * 250;     // 1.5 – 2.5 s visible
+    const phase = (Date.now() + h0 * 307 + h1 * 521) % cycle;
+    if (phase > showDuration) return;
 
     const msg = this.getCreatureMood(creature);
     if (!msg) return;
 
-    const alpha = phase < 300 ? phase / 300 :
-                  phase > 1700 ? (2000 - phase) / 300 : 1;
+    const fadeIn = 300;
+    const fadeOut = 300;
+    const alpha = phase < fadeIn ? phase / fadeIn :
+                  phase > showDuration - fadeOut ? (showDuration - phase) / fadeOut : 1;
 
     this.ctx.save();
     this.ctx.globalAlpha = alpha * 0.9;
