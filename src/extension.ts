@@ -535,13 +535,15 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       case 'selectAgent': {
         agentManager.selectAgent(message.agentId);
-        // Switch terminal when agent is selected (most reliable path)
         const selAgent = agentManager.getById(message.agentId);
-        if (selAgent) {
-          const selTerminal = agentTerminals.get(selAgent.id);
-          if (selTerminal && !selTerminal.exitStatus) {
-            selTerminal.show(true);
-          }
+        const selTerminal = selAgent ? agentTerminals.get(selAgent.id) : undefined;
+        const termCount = agentTerminals.size;
+        const allTermNames = [...agentTerminals.entries()].map(([id, t]) => `${id.slice(-4)}→${t.name}`).join(', ');
+        void vscode.window.showInformationMessage(
+          `[selectAgent] agent=${selAgent?.name ?? 'NONE'} terminal=${selTerminal?.name ?? 'NONE'} map(${termCount}): ${allTermNames}`
+        );
+        if (selTerminal && !selTerminal.exitStatus) {
+          selTerminal.show(false);
         }
         sendWorldUpdate();
         return true;
