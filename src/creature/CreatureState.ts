@@ -31,21 +31,31 @@ const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
 
 export function calculateLevel(exp: number): number {
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
-    if (exp >= LEVEL_THRESHOLDS[i]) return i + 1;
+    if (exp >= LEVEL_THRESHOLDS[i]) {return i + 1;}
   }
   return 1;
 }
 
 export function calculateStage(level: number): CreatureStage {
-  if (level <= 2) return 'egg';
-  if (level <= 6) return 'baby';
+  if (level <= 2) {return 'egg';}
+  if (level <= 6) {return 'baby';}
   return 'adult';
 }
+
+const STAGE_RANK: Record<CreatureStage, number> = {
+  egg: 0,
+  baby: 1,
+  adult: 2,
+};
 
 export function addExp(creature: CreatureData, amount: number): CreatureData {
   const newExp = creature.exp + amount;
   const newLevel = calculateLevel(newExp);
-  const newStage = calculateStage(newLevel);
+  const calculatedStage = calculateStage(newLevel);
+  // Prevent stage regression: keep current stage if it outranks the calculated one
+  const newStage = STAGE_RANK[calculatedStage] >= STAGE_RANK[creature.stage]
+    ? calculatedStage
+    : creature.stage;
   return {
     ...creature,
     exp: newExp,
@@ -134,7 +144,7 @@ export function feedCreature(creature: CreatureData): CreatureData {
   return {
     ...withExp,
     hunger: newHunger,
-    mood: calculateMood(newHunger, creature.happiness),
+    mood: calculateMood(newHunger, withExp.happiness),
     animationState: 'eat' as AnimationState,
     animationFrame: 0,
     lastFed: Date.now(),
@@ -153,7 +163,7 @@ export function petCreature(creature: CreatureData): CreatureData {
   return {
     ...withExp,
     happiness: newHappiness,
-    mood: calculateMood(creature.hunger, newHappiness),
+    mood: calculateMood(withExp.hunger, newHappiness),
     animationState: 'happy' as AnimationState,
     animationFrame: 0,
     lastPetted: Date.now(),
@@ -269,17 +279,19 @@ export function setCreatureMoodByBugs(creature: CreatureData, hasBugs: boolean):
   return {
     ...creature,
     mood: calculateMood(creature.hunger, creature.happiness),
+    animationState: 'idle' as AnimationState,
   };
 }
 
 function calculateMood(hunger: number, happiness: number): CreatureMood {
   const avg = (hunger + happiness) / 2;
-  if (avg > 60) return 'happy';
-  if (avg > 30) return 'neutral';
+  if (avg > 60) {return 'happy';}
+  if (avg > 30) {return 'neutral';}
   return 'sad';
 }
 
 function getWalkDirection(dx: number, dy: number): AnimationState {
+  if (dx === 0 && dy === 0) {return 'idle';}
   if (Math.abs(dx) > Math.abs(dy)) {
     return dx > 0 ? 'walk_right' : 'walk_left';
   }

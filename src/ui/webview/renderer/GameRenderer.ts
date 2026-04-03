@@ -62,14 +62,25 @@ export class GameRenderer {
     // Clear entire canvas (before any transform)
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+    // Fill background color as fallback
+    this.ctx.fillStyle = '#1A1A2E';
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
     // === World layer (affected by zoom & pan) ===
     this.ctx.save();
     this.ctx.translate(panOffsetX, panOffsetY);
     this.ctx.scale(zoom, zoom);
 
-    // White background
-    this.ctx.fillStyle = '#FFFFFF';
-    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    // Draw background room image
+    const bgKey = `bg_${this.currentBgIndex}`;
+    const bgImg = this.spriteRenderer.getImage(bgKey);
+    if (bgImg) {
+      this.ctx.drawImage(bgImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    } else {
+      // Fallback: solid color
+      this.ctx.fillStyle = '#1A1A2E';
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
 
     // Draw gravestones
     for (const grave of world.graveStones) {
@@ -296,7 +307,7 @@ export class GameRenderer {
   }
 
   private updateCommitEffect(): void {
-    if (this.commitEffectProgress <= 0) return;
+    if (this.commitEffectProgress <= 0) {return;}
 
     const elapsed = Date.now() - this.commitEffectStart;
     this.commitEffectProgress = Math.max(0, 1 - elapsed / this.COMMIT_EFFECT_DURATION);

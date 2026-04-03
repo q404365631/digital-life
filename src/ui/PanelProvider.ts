@@ -5,6 +5,7 @@ export class PanelProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | null = null;
   private onMessageCallback: ((message: WebToExtMessage) => void) | null = null;
   private onVisibilityChangeCallback: ((visible: boolean) => void) | null = null;
+  private listenerDisposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly extensionUri: vscode.Uri
@@ -15,6 +16,12 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ): void {
+    // Dispose previous listeners before re-registering
+    for (const d of this.listenerDisposables) {
+      d.dispose();
+    }
+    this.listenerDisposables = [];
+
     this.view = webviewView;
 
     webviewView.webview.options = {
@@ -27,17 +34,21 @@ export class PanelProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    webviewView.webview.onDidReceiveMessage((message: WebToExtMessage) => {
-      if (this.onMessageCallback) {
-        this.onMessageCallback(message);
-      }
-    });
+    this.listenerDisposables.push(
+      webviewView.webview.onDidReceiveMessage((message: WebToExtMessage) => {
+        if (this.onMessageCallback) {
+          this.onMessageCallback(message);
+        }
+      })
+    );
 
-    webviewView.onDidChangeVisibility(() => {
-      if (this.onVisibilityChangeCallback) {
-        this.onVisibilityChangeCallback(webviewView.visible);
-      }
-    });
+    this.listenerDisposables.push(
+      webviewView.onDidChangeVisibility(() => {
+        if (this.onVisibilityChangeCallback) {
+          this.onVisibilityChangeCallback(webviewView.visible);
+        }
+      })
+    );
   }
 
   get isVisible(): boolean {
@@ -73,43 +84,42 @@ export class PanelProvider implements vscode.WebviewViewProvider {
     );
     const nonce = getNonce();
 
-    const creatureSprites: Record<string, string> = {};
+    const creatureSprites: Record<string, { sheet: string; actions: string }> = {};
     const species = ['dot', 'puff', 'chomp', 'blob', 'pip', 'wisp'];
     for (const s of species) {
-      creatureSprites[s] = webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `creature_${s}.png`)
-      ).toString();
+      creatureSprites[s] = {
+        sheet: webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `creature_${s}_sheet.png`)
+        ).toString(),
+        actions: webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `creature_${s}_actions.png`)
+        ).toString(),
+      };
     }
 
-    const agentSprites: Record<string, string> = {};
+    const agentSprites: Record<string, { sheet: string; actions: string }> = {};
     for (let i = 0; i < 5; i++) {
-      // Idle
-      agentSprites[String(i)] = webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}.png`)
-      ).toString();
-      // Walk frames
-      for (let f = 0; f < 4; f++) {
-        agentSprites[`${i}_f${f}`] = webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_f${f}.png`)
-        ).toString();
-      }
-    }
-
-    // Sit frames
-    const sitIndices = [0, 1, 2, 3, 4];
-    for (const idx of sitIndices) {
-      agentSprites[`${idx}_sit`] = webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${idx}_sit.png`)
-      ).toString();
+      agentSprites[String(i)] = {
+        sheet: webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_sheet.png`)
+        ).toString(),
+        actions: webview.asWebviewUri(
+          vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `agent_${i}_actions.png`)
+        ).toString(),
+      };
     }
 
     // Background images
-    const bgSprites: Record<string, string> = {};
+    const bgTilesUrl = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', 'bg_tiles.png')
+    ).toString();
+    const bgRooms: Record<string, string> = {};
     for (let i = 0; i < 3; i++) {
-      bgSprites[String(i)] = webview.asWebviewUri(
+      bgRooms[String(i)] = webview.asWebviewUri(
         vscode.Uri.joinPath(this.extensionUri, 'dist', 'sprites', `bg_room_${i}.png`)
       ).toString();
     }
+    const bgSprites = { tiles: bgTilesUrl, rooms: bgRooms };
 
     return `<!DOCTYPE html>
 <html lang="ja">

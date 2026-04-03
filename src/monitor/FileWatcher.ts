@@ -11,7 +11,6 @@ export interface FileWatcherCallbacks {
 
 export class FileWatcher {
   private watcher: chokidar.FSWatcher | null = null;
-  private readonly debounceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor(
     private readonly workspacePath: string,
@@ -43,34 +42,19 @@ export class FileWatcher {
       void this.watcher.close();
       this.watcher = null;
     }
-    for (const timer of this.debounceTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.debounceTimers.clear();
   }
 
   private handleEvent(event: FileEvent, filePath: string): void {
-    const key = `${event}:${filePath}`;
-    const existing = this.debounceTimers.get(key);
-    if (existing) {
-      clearTimeout(existing);
+    switch (event) {
+      case 'add':
+        this.callbacks.onFileAdd(filePath);
+        break;
+      case 'change':
+        this.callbacks.onFileChange(filePath);
+        break;
+      case 'unlink':
+        this.callbacks.onFileDelete(filePath);
+        break;
     }
-
-    const timer = setTimeout(() => {
-      this.debounceTimers.delete(key);
-      switch (event) {
-        case 'add':
-          this.callbacks.onFileAdd(filePath);
-          break;
-        case 'change':
-          this.callbacks.onFileChange(filePath);
-          break;
-        case 'unlink':
-          this.callbacks.onFileDelete(filePath);
-          break;
-      }
-    }, FILE_DEBOUNCE);
-
-    this.debounceTimers.set(key, timer);
   }
 }

@@ -76,15 +76,15 @@ const webviewConfig = {
           to: path.resolve(__dirname, 'dist', 'webview'),
         },
         {
-          from: 'assets/sprites/creature_*.png',
+          from: 'assets/sprites/*_sheet.png',
           to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
         },
         {
-          from: 'assets/sprites/agent_*.png',
+          from: 'assets/sprites/*_actions.png',
           to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
         },
         {
-          from: 'assets/sprites/bg_room_*.png',
+          from: 'assets/sprites/bg_*.png',
           to: path.resolve(__dirname, 'dist', 'sprites', '[name][ext]'),
         },
       ],

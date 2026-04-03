@@ -332,12 +332,14 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       // Will be handled via next worldUpdate
       break;
 
-    case 'creatureDied':
+    case 'creatureDied': {
       soundEngine.playDeath();
       if (selectedCreatureId === message.creatureId) {
-        selectedCreatureId = creatures.length > 0 ? creatures[0].id : null;
+        const alive = creatures.filter(c => c.id !== message.creatureId);
+        selectedCreatureId = alive.length > 0 ? alive[0].id : null;
       }
       break;
+    }
 
     case 'commitDetected':
       renderer.triggerCommitEffect();
@@ -349,12 +351,6 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
 
     case 'agentChat': {
-      const agentChatBubble = document.getElementById('chat-bubble');
-      if (agentChatBubble) {
-        const chatAgent = agents.find(a => a.id === message.agentId);
-        const name = chatAgent?.name ?? 'Agent';
-        agentChatBubble.textContent = `${name}: ${message.message}`;
-      }
       agentChats.set(message.agentId, { message: message.message, timestamp: Date.now() });
       break;
     }
@@ -428,7 +424,8 @@ document.addEventListener('keydown', (event: KeyboardEvent) => {
   // Space key to toggle sit/stand
   if (event.key === ' ' && selectedAgentId) {
     event.preventDefault();
-    vscode.postMessage({ type: 'sitAgent', agentId: selectedAgentId, sitting: true });
+    const agent = agents.find(a => a.id === selectedAgentId);
+    vscode.postMessage({ type: 'sitAgent', agentId: selectedAgentId, sitting: !(agent?.isSitting ?? false) });
   }
 });
 
@@ -577,15 +574,23 @@ function setActionMode(mode: ActionMode): void {
   hideEduMessage();
 }
 
+let eduMessageTimerId: ReturnType<typeof setTimeout> | null = null;
+
 function showEduMessage(msg: string, isWrong: boolean = false): void {
   if (eduMessage) {
+    if (eduMessageTimerId !== null) {
+      clearTimeout(eduMessageTimerId);
+    }
     eduMessage.textContent = msg;
     eduMessage.classList.remove('hidden', 'wrong');
     if (isWrong) {
       eduMessage.classList.add('wrong');
     }
     // Auto-hide after 5 seconds
-    setTimeout(() => hideEduMessage(), 5000);
+    eduMessageTimerId = setTimeout(() => {
+      hideEduMessage();
+      eduMessageTimerId = null;
+    }, 5000);
   }
 }
 
@@ -658,6 +663,7 @@ if (savedLangState?.language) {
 
 // Game loop
 let lastTime = 0;
+let animationFrameId: number = 0;
 
 function gameLoop(timestamp: number): void {
   const delta = timestamp - lastTime;
@@ -722,9 +728,19 @@ function gameLoop(timestamp: number): void {
     }
   }
 
-  requestAnimationFrame(gameLoop);
+  animationFrameId = requestAnimationFrame(gameLoop);
 }
+
+// Pause rAF when tab is hidden, resume when visible
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(animationFrameId);
+  } else {
+    lastTime = 0;
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+});
 
 // Initialize
 vscode.postMessage({ type: 'ready' });
-requestAnimationFrame(gameLoop);
+animationFrameId = requestAnimationFrame(gameLoop);

@@ -9,6 +9,8 @@ export class GitWatcher {
   private git: SimpleGit;
   private lastSha: string = '';
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private stopped: boolean = false;
+  private _lastCommitTime: number = 0;
 
   constructor(
     private readonly workspacePath: string,
@@ -18,6 +20,8 @@ export class GitWatcher {
   }
 
   async start(): Promise<void> {
+    this.stopped = false;
+
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
@@ -31,12 +35,17 @@ export class GitWatcher {
       return;
     }
 
+    if (this.stopped) {
+      return;
+    }
+
     this.pollTimer = setInterval(() => {
       void this.checkForNewCommit();
     }, GIT_POLL_INTERVAL);
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
@@ -47,11 +56,16 @@ export class GitWatcher {
     return this.lastSha;
   }
 
+  getLastCommitTime(): number {
+    return this._lastCommitTime;
+  }
+
   private async checkForNewCommit(): Promise<void> {
     try {
       const log = await this.git.log({ maxCount: 1 });
       if (log.latest && log.latest.hash !== this.lastSha) {
         this.lastSha = log.latest.hash;
+        this._lastCommitTime = Date.now();
         this.callbacks.onCommit(log.latest.hash);
       }
     } catch {

@@ -176,9 +176,9 @@ export class UIRenderer {
     for (let row = 0; row < sprite.length; row++) {
       for (let col = 0; col < sprite[row].length; col++) {
         const paletteIndex = sprite[row][col];
-        if (paletteIndex === 0) continue;
+        if (paletteIndex === 0) {continue;}
         const color = palette[paletteIndex];
-        if (!color || color === 'transparent') continue;
+        if (!color || color === 'transparent') {continue;}
         this.ctx.fillStyle = color;
         this.ctx.fillRect(x + col, y + row, 1, 1);
       }

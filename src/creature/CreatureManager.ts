@@ -92,9 +92,9 @@ export class CreatureManager {
 
   updateFileHealth(sourceFile: string, health: FileHealth): void {
     const creatureId = this.fileToCreatureId.get(sourceFile);
-    if (!creatureId) return;
+    if (!creatureId) {return;}
     const creature = this.creatures.get(creatureId);
-    if (!creature) return;
+    if (!creature) {return;}
     this.creatures.set(creatureId, { ...creature, fileHealth: health });
   }
 
@@ -129,13 +129,14 @@ export class CreatureManager {
 
   tick(deltaMs: number): void {
     const deltaMinutes = deltaMs / 60000;
+    const snapshot = this.getAll();
 
     for (const [id, creature] of this.creatures) {
       let updated = updateHatchProgress(creature, deltaMs);
       updated = updateCreatureNeeds(updated, deltaMinutes);
       updated = updateReactionTimer(updated, deltaMs);
       updated = updateCreatureMovement(updated);
-      updated = checkCreatureInteraction(updated, this.getAll());
+      updated = checkCreatureInteraction(updated, snapshot);
 
       // Advance animation frame
       updated = {

@@ -4,10 +4,15 @@ const DEFAULT_PALETTE: ColorPalette = [
   'transparent', '#1A1A1A', '#333333', '#0D0D0D', '#FFFFFF', '#000000', '#4A4A4A',
 ];
 
+interface SheetPair {
+  sheet: string;
+  actions: string;
+}
+
 interface SpriteStore {
-  creatures: Record<string, string>;
-  agents: Record<string, string>;
-  backgrounds?: Record<string, string>;
+  creatures: Record<string, SheetPair>;
+  agents: Record<string, SheetPair>;
+  backgrounds: { tiles?: string; rooms: Record<string, string> };
 }
 
 export class SpriteRenderer {
@@ -25,16 +30,21 @@ export class SpriteRenderer {
       return;
     }
 
-    for (const [species, url] of Object.entries(sprites.creatures)) {
-      this.loadImage(`creature_${species}`, url);
+    for (const [species, pair] of Object.entries(sprites.creatures)) {
+      this.loadImage(`creature_${species}_sheet`, pair.sheet);
+      this.loadImage(`creature_${species}_actions`, pair.actions);
     }
 
-    for (const [index, url] of Object.entries(sprites.agents)) {
-      this.loadImage(`agent_${index}`, url);
+    for (const [index, pair] of Object.entries(sprites.agents)) {
+      this.loadImage(`agent_${index}_sheet`, pair.sheet);
+      this.loadImage(`agent_${index}_actions`, pair.actions);
     }
 
     if (sprites.backgrounds) {
-      for (const [key, url] of Object.entries(sprites.backgrounds)) {
+      if (sprites.backgrounds.tiles) {
+        this.loadImage('bg_tiles', sprites.backgrounds.tiles);
+      }
+      for (const [key, url] of Object.entries(sprites.backgrounds.rooms)) {
         this.loadImage(`bg_${key}`, url);
       }
     }
@@ -58,12 +68,43 @@ export class SpriteRenderer {
     this.imageCache.set(key, img);
   }
 
-  renderCreature(creature: CreatureData): void {
-    const key = `creature_${creature.species}`;
-    const img = this.imageCache.get(key);
-    if (!img || !this.loadedImages.get(key)) {
-      return;
+  private drawFromSheet(
+    sheetKey: string,
+    col: number,
+    row: number,
+    destX: number,
+    destY: number,
+    destSize: number,
+    flipX: boolean = false
+  ): boolean {
+    const img = this.imageCache.get(sheetKey);
+    if (!img || !this.loadedImages.get(sheetKey)) {
+      return false;
     }
+
+    const cellW = img.naturalWidth / 4;
+    const cellH = img.naturalHeight / 5;
+    const srcX = col * cellW;
+    const srcY = row * cellH;
+
+    this.ctx.save();
+    if (flipX) {
+      this.ctx.translate(destX + destSize / 2, 0);
+      this.ctx.scale(-1, 1);
+      this.ctx.translate(-(destX + destSize / 2), 0);
+    }
+    this.ctx.drawImage(
+      img,
+      srcX, srcY, cellW, cellH,
+      destX, destY, destSize, destSize
+    );
+    this.ctx.restore();
+    return true;
+  }
+
+  renderCreature(creature: CreatureData): void {
+    const sheetKey = `creature_${creature.species}_sheet`;
+    const actionsKey = `creature_${creature.species}_actions`;
 
     const CREATURE_RENDER_SIZE = 26;
     const renderSize = CREATURE_RENDER_SIZE;
@@ -74,6 +115,52 @@ export class SpriteRenderer {
       scaleX = 1.3;
     } else if (lineCount > 100) {
       scaleX = 1.15;
+    }
+
+    // Determine sprite cell based on creature animationState / stage
+    const frameIndex = Math.floor(Date.now() / 200) % 4;
+    let useSheet = sheetKey;
+    let col = 0;
+    let row = 0;
+    let flipX = false;
+
+    const anim = creature.animationState;
+    if (anim === 'walk_down') {
+      row = 1;
+      col = frameIndex;
+    } else if (anim === 'walk_up') {
+      row = 2;
+      col = frameIndex;
+    } else if (anim === 'walk_left') {
+      row = 3;
+      col = frameIndex;
+    } else if (anim === 'walk_right') {
+      row = 3;
+      col = frameIndex;
+      flipX = true;
+    } else if (anim === 'eat') {
+      useSheet = actionsKey;
+      row = 1;
+      col = 0;
+    } else if (anim === 'happy') {
+      useSheet = actionsKey;
+      row = 0;
+      col = 0;
+    } else if (anim === 'sad') {
+      useSheet = actionsKey;
+      row = 0;
+      col = 2;
+    } else if (anim === 'sleep') {
+      useSheet = actionsKey;
+      row = 0;
+      col = 1;
+    } else if (anim === 'hatch' || creature.stage === 'egg') {
+      row = 4;
+      col = 0;
+    } else {
+      // idle
+      row = 0;
+      col = frameIndex;
     }
 
     this.ctx.save();
@@ -89,15 +176,21 @@ export class SpriteRenderer {
       this.ctx.filter = `saturate(${Math.max(0.3, 1 - bugCount * 0.15)}) brightness(${Math.max(0.7, 1 - bugCount * 0.08)})`;
     }
 
-    this.ctx.drawImage(
-      img,
+    const drawn = this.drawFromSheet(
+      useSheet,
+      col,
+      row,
       creature.position.x - renderSize / 2,
       creature.position.y - renderSize / 2,
-      renderSize * scaleX,
-      renderSize
+      renderSize,
+      flipX
     );
 
     this.ctx.restore();
+
+    if (!drawn) {
+      return;
+    }
 
     // Name label with background pill
     if (creature.stage !== 'egg') {
@@ -213,43 +306,43 @@ export class SpriteRenderer {
   }
 
   renderAgent(agent: AgentData, isSelected: boolean = false): void {
-    const isMoving = agent.targetPosition !== null;
-
-    let imgKey: string;
-    if (agent.isSitting) {
-      const sitKey = `agent_${agent.spriteIndex}_sit`;
-      const sitImg = this.imageCache.get(sitKey);
-      if (sitImg && this.loadedImages.get(sitKey)) {
-        imgKey = sitKey;
-      } else {
-        imgKey = `agent_${agent.spriteIndex}`;
-      }
-    } else if (isMoving) {
-      const frameIdx = Math.floor(Date.now() / 200) % 4;
-      imgKey = `agent_${agent.spriteIndex}_f${frameIdx}`;
-    } else {
-      const idleFrame = Math.floor(Date.now() / 600) % 2;
-      imgKey = idleFrame === 0 ? `agent_${agent.spriteIndex}` : `agent_${agent.spriteIndex}_f1`;
-    }
-
-    const img = this.imageCache.get(imgKey);
-    if (!img || !this.loadedImages.get(imgKey)) {
-      // fallback to idle
-      const fallbackKey = `agent_${agent.spriteIndex}`;
-      const fallback = this.imageCache.get(fallbackKey);
-      if (!fallback || !this.loadedImages.get(fallbackKey)) {
-        return;
-      }
-      this.drawAgentImage(fallback, agent, isMoving, isSelected);
-      return;
-    }
-
-    this.drawAgentImage(img, agent, isMoving, isSelected);
-  }
-
-  private drawAgentImage(img: HTMLImageElement, agent: AgentData, isMoving: boolean, isSelected: boolean = false): void {
     const AGENT_RENDER_SIZE = 64;
     const renderSize = AGENT_RENDER_SIZE;
+    const isMoving = agent.targetPosition !== null;
+
+    const sheetKey = `agent_${agent.spriteIndex}_sheet`;
+    const actionsKey = `agent_${agent.spriteIndex}_actions`;
+
+    // Determine sprite cell
+    let useSheet = sheetKey;
+    let col = 0;
+    let row = 0;
+
+    if (agent.isSitting) {
+      row = 3;
+      col = 3;
+    } else if (agent.status === 'generating') {
+      useSheet = actionsKey;
+      row = 0;
+      col = 0;
+    } else if (agent.status === 'error') {
+      useSheet = actionsKey;
+      row = 1;
+      col = 2;
+    } else if (agent.status === 'done') {
+      useSheet = actionsKey;
+      row = 1;
+      col = 0;
+    } else if (isMoving) {
+      const frameIdx = Math.floor(Date.now() / 200) % 4;
+      row = 1;
+      col = frameIdx;
+    } else {
+      // idle - slow animation
+      const idleFrame = Math.floor(Date.now() / 600) % 2;
+      row = 0;
+      col = idleFrame;
+    }
 
     if (isSelected) {
       this.ctx.save();
@@ -274,13 +367,15 @@ export class SpriteRenderer {
       this.ctx.translate(-agent.position.x, -agent.position.y);
     }
 
-    this.ctx.drawImage(
-      img,
+    this.drawFromSheet(
+      useSheet,
+      col,
+      row,
       agent.position.x - renderSize / 2,
       agent.position.y - renderSize / 2 + bounce,
-      renderSize,
       renderSize
     );
+
     this.ctx.restore();
 
     this.ctx.save();

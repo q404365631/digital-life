@@ -12,12 +12,17 @@ export class CreatureStorage {
       monitorState,
       agents,
     };
-    void this.globalState.update(STORAGE_KEY, state);
+    // eslint-disable-next-line no-console -- intentional error logging for storage failures
+    void this.globalState.update(STORAGE_KEY, state).then(undefined, (err: unknown) => console.error('Storage save failed:', err));
   }
 
   load(): StoredState | null {
     const raw = this.globalState.get<StoredState>(STORAGE_KEY);
     if (!raw) {
+      return null;
+    }
+    // Validate required fields exist
+    if (!raw.world || !raw.creatures || !raw.monitorState) {
       return null;
     }
     // Ensure graveStones field exists for backward compatibility

@@ -51,7 +51,7 @@ export class MonitorManager {
       fileCount: this.bugCountByFile.size,
       bugCount: this.totalBugCount,
       lastCommitSha: this.gitWatcher.getLastSha(),
-      lastCommitTime: Date.now(),
+      lastCommitTime: this.gitWatcher.getLastCommitTime(),
     };
   }
 

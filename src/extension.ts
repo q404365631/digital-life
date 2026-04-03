@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!spawnEnabled) {
         return;
       }
-      const fileName = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? 'unknown';
+      const fileName = path.basename(filePath);
       const species = getSpeciesForFile(filePath);
       const speciesName = SPECIES_DATA[species].name;
       void promptForName(fileName, speciesName).then((name) => {
@@ -95,10 +95,14 @@ export function activate(context: vscode.ExtensionContext): void {
       // If any agent is running, briefly show generating status
       for (const agent of agentManager.getAll()) {
         if (agent.status === 'running') {
-          agentManager.updateStatus(agent.id, 'generating');
+          const agentId = agent.id;
+          agentManager.updateStatus(agentId, 'generating');
           setTimeout(() => {
-            agentManager.updateStatus(agent.id, 'running');
-            sendWorldUpdate();
+            const current = agentManager.getById(agentId);
+            if (current && current.status === 'generating') {
+              agentManager.updateStatus(agentId, 'running');
+              sendWorldUpdate();
+            }
           }, 2000);
         }
       }
@@ -198,6 +202,11 @@ export function activate(context: vscode.ExtensionContext): void {
           const agent = agentManager.addAgent(agentType, AGENT_NAMES[agentType] ?? 'Agent');
           const terminal = vscode.window.createTerminal({ name: agentTerminalName(agent.name) });
           terminal.show();
+          void terminal.processId.then(pid => {
+            if (pid !== undefined) {
+              agentManager.setTerminalId(agent.id, pid);
+            }
+          });
           const cmd = AGENT_TERMINAL_CMDS[agentType];
           if (cmd) {
             terminal.sendText(cmd);
@@ -266,22 +275,43 @@ export function activate(context: vscode.ExtensionContext): void {
         saveState();
         break;
       }
+      case 'chatAgent': {
+        // TODO: Implement agent chat feature
+        // eslint-disable-next-line no-console -- placeholder until agent chat logging is implemented
+        console.debug(`[Digital Life] chatAgent message received for agent ${message.agentId}: ${message.message}`);
+        break;
+      }
     }
   });
 
   // Terminal close handler for agents
   context.subscriptions.push(
     vscode.window.onDidCloseTerminal((terminal) => {
-      for (const agent of agentManager.getAll()) {
-        if (terminal.name === agentTerminalName(agent.name) || terminal.name.toLowerCase().includes(agent.name.toLowerCase())) {
-          agentManager.updateStatus(agent.id, 'done');
-          sendWorldUpdate();
-          setTimeout(() => {
-            agentManager.updateStatus(agent.id, 'idle');
+      void terminal.processId.then(closedPid => {
+        for (const agent of agentManager.getAll()) {
+          let matched = false;
+          // Prefer exact match by terminalId (process ID) when available
+          if (agent.terminalId !== null && closedPid !== undefined) {
+            matched = closedPid === agent.terminalId;
+          }
+          // Fallback: exact match by terminal name
+          if (!matched) {
+            matched = terminal.name === agentTerminalName(agent.name);
+          }
+          if (matched) {
+            const agentId = agent.id;
+            agentManager.updateStatus(agentId, 'done');
             sendWorldUpdate();
-          }, 3000);
+            setTimeout(() => {
+              const current = agentManager.getById(agentId);
+              if (current && current.status === 'done') {
+                agentManager.updateStatus(agentId, 'idle');
+                sendWorldUpdate();
+              }
+            }, 3000);
+          }
         }
-      }
+      });
     })
   );
 
@@ -456,7 +486,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   function sendHealCommand(terminal: vscode.Terminal, action: string, creature: CreatureData): void {
     const filePath = creature.sourceFile;
-    const fileName = filePath.split('/').pop() ?? filePath;
+    const fileName = path.basename(filePath);
 
     switch (action) {
       case 'diet':
@@ -472,6 +502,9 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   function sendWorldUpdate(): void {
+    if (!panelProvider.isVisible) {
+      return;
+    }
     const msg: ExtToWebMessage = {
       type: 'worldUpdate',
       creatures: creatureManager.getAll(),
