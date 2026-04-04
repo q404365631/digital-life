@@ -1,33 +1,103 @@
-# Digital Life by SHIKAKERU
+# Digital Life
 
-> **Save tokens. See your code.** AI-generated code health visualizer for the agent era.
+**コードが、生きている。**
 
-## What is this?
+<!-- TODO: ここにデモGIF/動画を配置 -->
+<!-- ![Digital Life Demo](assets/demo.gif) -->
 
-An AI Agent Code Health Visualizer for VS Code. Your codebase spawns 3D fluffy creatures and voxel AI robot agents that react to your coding habits in real-time. File health, code smells, and agent activity are all visualized as a living digital ecosystem.
+---
 
-## Features
+## あなたのコードには、命が宿る
 
-- **6 Species of 3D Fluffy Creatures** — Puff (Python), Blob (Go), Pip (Swift/Kotlin), Wisp (Vue/Svelte), Chomp (Rust/C/C++), Dot (TypeScript/JavaScript). Each species has unique colors and personality.
-- **5 Voxel AI Robot Agents** — Claude, Cursor, Copilot, and Custom agent types. Add agents and watch them patrol your codebase.
-- **File Health Visualization** — Line count, bug count, and last modified time displayed per creature. Code smells (TODO, console.log, `any` types) trigger visual warnings.
-- **4 Prescription Actions** — Feed (nourish creatures), Diet (split large files), Cure (fix bugs), Wake (review old files). Click to activate, then click a creature to apply.
-- **Coding DNA** — Your coding habits (commit frequency, night owl tendency, polyglot score, velocity, consistency) are analyzed and affect creature behavior.
-- **Keyboard Agent Control** — Select an agent and move with WASD or Arrow keys.
-- **3 Background Rooms** — Switch between Room 1, Room 2, and Room 3 with the Room button.
-- **i18n** — English and Japanese language support.
-- **Persistent** — Creatures and agents survive across sessions.
-- **Sound Effects** — Audio feedback for feeding and interactions.
+私たちはコードを「テキストファイル」として扱ってきました。
+しかし、コードには健康状態があり、成長があり、老化があります。
 
-## Quick Start
+Digital Life は、その見えない生命をあなたの目の前に現します。
 
-1. Install from VS Code Marketplace (coming soon) or build from source
-2. Open any project folder
-3. Open the **Digital Life** panel (bottom panel)
-4. Create a `.ts` or `.py` file — your first creature is born!
-5. Name it and start caring
+あなたが書いたファイルから生き物が生まれ、
+コードが健全なら元気に歩き回り、
+バグが増えれば悲しそうにうつむく。
 
-## Building from Source
+これはツールではありません。
+**コードとの新しい関係性です。**
+
+---
+
+## なぜ「生き物」なのか
+
+ダッシュボードは情報を伝えますが、感情は伝えません。
+
+「バグ数: 12」と表示されても、人は動きません。
+しかし、自分が名前をつけた生き物が苦しそうにしていたら——
+自然とコードを直したくなる。
+
+**人間の「共感」という力を、インターフェイスに変換する。**
+それが Digital Life の設計思想です。
+
+AIエージェントがコードを書く時代。
+人間が書いたのか、AIが書いたのか、もはや区別がつかない。
+だからこそ、コードの健全性を「数値」ではなく「感覚」で捉えられる
+新しいインターフェイスが必要なのです。
+
+---
+
+## 世界の仕組み
+
+| あなたのアクション | 世界で起きること |
+|---|---|
+| ファイルを作る | 生き物が生まれる |
+| コードを書く | 健康診断が走る |
+| `git commit` する | 全生物に栄養が届き、金色の光が降り注ぐ |
+| `// TODO` を残す | 空が曇り、生き物が不安になる |
+| `console.log()` を放置する | バグが発生する |
+| ファイルを削除する | 生き物が静かに去っていく |
+
+---
+
+## 6つの種族
+
+ファイルの拡張子から、異なる種族の生き物が生まれます。
+
+| 種族 | ファイル | 性格 |
+|---|---|---|
+| **Puff** | `.py` | ふわふわで内向的 |
+| **Blob** | `.go` | のんびり穏やか |
+| **Pip** | `.swift` `.kt` | 好奇心旺盛で素早い |
+| **Wisp** | `.vue` `.svelte` | 神秘的で静か |
+| **Chomp** | `.rs` `.c` `.cpp` `.h` | 食いしん坊で頑丈 |
+| **Dot** | `.ts` `.tsx` `.js` `.jsx` | クールで知的 |
+
+---
+
+## AIエージェントとの共存
+
+VS Code 上で動く AI エージェント（Claude, Cursor, Copilot）を
+ボクセルロボットとして世界に召喚できます。
+
+エージェントがコードベースを巡回する様子を眺めたり、
+キーボードで操作して一緒に世界を歩くことができます。
+
+**人間と AI が同じ空間に存在する。**
+それが、これからの開発環境のあるべき姿だと考えています。
+
+---
+
+## コーディングDNA
+
+あなたのコーディング習慣は5つのDNA特性として解析され、
+生き物の行動に影響を与えます。
+
+- **Commit Frequency** — コミットの頻度
+- **Night Owl** — 深夜コーディングの傾向
+- **Polyglot** — 使用言語の多様性
+- **Velocity** — コーディングの速度
+- **Consistency** — 習慣の一貫性
+
+あなたのDNAが、あなただけの生態系を作ります。
+
+---
+
+## はじめる
 
 ```bash
 git clone https://github.com/teamshikakeru-glitch/digital-life.git
@@ -36,71 +106,57 @@ npm install
 npm run build
 ```
 
-Press **F5** in VS Code to launch the Extension Development Host.
+VS Code で **F5** を押して起動。下部パネルに **Digital Life** が現れます。
 
-## How It Works
-
-| Your Action | World Effect |
-|---|---|
-| Create source file | New creature born (species based on file extension) |
-| Edit code | Bug scan runs, file health updated |
-| `git commit` | All creatures fed + golden sparkle effect |
-| `// TODO` in code | Bugs appear, weather worsens |
-| `console.log()` | Bugs appear |
-| `: any` type | Bugs appear |
-| Delete source file | Linked creature dies |
-
-## Controls
-
-| Action | How |
-|---|---|
-| Feed | Click Feed button, then click creature |
-| Diet | Click Diet button, then click creature |
-| Cure | Click Cure button, then click creature |
-| Wake | Click Wake button, then click creature |
-| Move agent | Select agent, then WASD or Arrow keys |
-| Switch room | Click Room button |
-| Select creature/agent | Click on it |
-| Zoom | Pinch / Ctrl+scroll |
-| Pan | Two-finger scroll / drag when zoomed |
-
-## Species
-
-| Species | File Types | Personality |
-|---|---|---|
-| Puff | `.py` | Fluffy and shy |
-| Blob | `.go` | Slimy and chill |
-| Pip | `.swift`, `.kt` | Curious and quick |
-| Wisp | `.vue`, `.svelte` | Mysterious and quiet |
-| Chomp | `.rs`, `.c`, `.cpp`, `.h` | Hungry and strong |
-| Dot | `.ts`, `.tsx`, `.js`, `.jsx` | Dark and mysterious |
-
-## Coding DNA
-
-Your coding habits are analyzed into 5 DNA traits that affect creature behavior:
-
-- **Commit Frequency** — How often you commit
-- **Night Owl** — How much you code at night
-- **Polyglot** — How many languages you use
-- **Velocity** — How fast you code
-- **Consistency** — How regular your coding pattern is
-
-## Tech Stack
-
-- TypeScript + Webpack
-- VS Code Webview API
-- Canvas 2D rendering
-- chokidar (file watching)
-- simple-git (commit detection)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT - [SHIKAKERU Inc.](https://shikakeru.com)
+ファイルを作ってみてください。最初の生き物が生まれます。
 
 ---
 
-Made with love by SHIKAKERU — AI-powered development studio from Fukui, Japan.
+## 操作
+
+| やりたいこと | 方法 |
+|---|---|
+| 生き物に餌をやる | 🍞 Feed → 生き物をクリック |
+| 生き物を治療する | 🩺 Care → 生き物をクリック |
+| エージェントを動かす | エージェント選択 → WASD / 矢印キー |
+| 部屋を切り替える | Room ボタン |
+| ズーム | ピンチ / Ctrl+スクロール |
+| スクリーンショット | 📷 ボタン |
+
+---
+
+## 天気と時間
+
+現実世界の天気がそのまま反映されます。
+雨が降れば世界に雨が降り、夜になれば空が暗くなる。
+
+あなたのコードの世界は、あなたの現実と繋がっています。
+
+*Open-Meteo API（天気）と ipinfo.io（位置情報）を使用。APIキー不要。個人データの保存はしません。*
+
+---
+
+## 技術スタック
+
+- TypeScript + Webpack
+- VS Code Webview API
+- Canvas 2D レンダリング
+- chokidar（ファイル監視）
+- simple-git（コミット検出）
+
+---
+
+## ライセンス
+
+MIT — [SHIKAKERU Inc.](https://shikakeru.com)
+
+---
+
+<p align="center">
+  <strong>コードは文字列ではない。生き物だ。</strong><br>
+  <em>Code is not text. It's alive.</em>
+</p>
+
+<p align="center">
+  Made by <a href="https://shikakeru.com">SHIKAKERU</a> — Fukui, Japan
+</p>
