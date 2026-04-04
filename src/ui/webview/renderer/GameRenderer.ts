@@ -53,10 +53,15 @@ export class GameRenderer {
   // Farewell scene (file deletion)
   private farewellName: string | null = null;
   private farewellStart: number = 0;
-  private readonly FAREWELL_DURATION = 3000;
+  private readonly FAREWELL_DURATION = 5000; // Extended for emotional impact — 堀井雄二
 
   // Selected agent for keyboard control
   private selectedAgentId: string | null = null;
+
+  // FPS monitoring
+  private frameCount = 0;
+  private fpsTimestamp = 0;
+  private currentFps = 60;
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.spriteRenderer = new SpriteRenderer(ctx);
@@ -132,6 +137,19 @@ export class GameRenderer {
   }
 
   render(rc: RenderContext): void {
+    // FPS tracking
+    this.frameCount++;
+    const now = performance.now();
+    if (now - this.fpsTimestamp >= 1000) {
+      this.currentFps = this.frameCount;
+      this.frameCount = 0;
+      this.fpsTimestamp = now;
+      if (this.currentFps < 30) {
+        // eslint-disable-next-line no-console
+        console.warn(`[Digital Life] Low FPS: ${this.currentFps}`);
+      }
+    }
+
     const {
       creatures, world, bugCount, zoom, panX: panOffsetX, panY: panOffsetY,
       selectedCreatureId, draggingCreatureId, agents, agentChats,
@@ -799,6 +817,10 @@ export class GameRenderer {
     }
   }
 
+  /**
+   * Farewell scene — "仲間が離脱する時、プレイヤーは本当に泣く" — 堀井雄二
+   * Extended 5s animation: slow dim → name rises → particles scatter → fade to light
+   */
   private renderFarewell(): void {
     if (!this.farewellName) return;
     const elapsed = Date.now() - this.farewellStart;
@@ -808,42 +830,87 @@ export class GameRenderer {
     }
 
     const progress = elapsed / this.FAREWELL_DURATION;
+    const cx = CANVAS_WIDTH / 2;
 
     this.ctx.save();
 
-    // Dim overlay — peaks at 0.3, then fades
-    const dimAlpha = progress < 0.2 ? progress / 0.2 * 0.4 :
-                     progress < 0.6 ? 0.4 :
-                     0.4 * (1 - (progress - 0.6) / 0.4);
+    // Phase 1 (0→0.15): Slow dim — the world pauses
+    // Phase 2 (0.15→0.7): Name floats up with light particles
+    // Phase 3 (0.7→1.0): Everything fades to soft light, then clears
+
+    // Dim overlay — slow in, hold, gentle out
+    const dimAlpha = progress < 0.15 ? progress / 0.15 * 0.5 :
+                     progress < 0.7 ? 0.5 :
+                     0.5 * (1 - (progress - 0.7) / 0.3);
     this.ctx.fillStyle = `rgba(10, 10, 30, ${dimAlpha})`;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Name floats upward from center and fades
-    const textAlpha = progress < 0.15 ? progress / 0.15 :
-                      progress > 0.7 ? (1 - progress) / 0.3 : 1;
-    const floatY = CANVAS_HEIGHT / 2 - progress * 30;
+    // Name floats upward slowly
+    const textAlpha = progress < 0.1 ? progress / 0.1 :
+                      progress > 0.8 ? (1 - progress) / 0.2 : 1;
+    const floatY = CANVAS_HEIGHT / 2 - progress * 40;
 
     this.ctx.globalAlpha = textAlpha;
     this.ctx.textAlign = 'center';
 
-    // Name
-    this.ctx.font = 'bold 14px sans-serif';
-    this.ctx.fillStyle = '#FFFFFF';
-    this.ctx.fillText(this.farewellName, CANVAS_WIDTH / 2, floatY);
+    // "Goodbye" text (small, above the name)
+    if (progress > 0.1 && progress < 0.85) {
+      this.ctx.font = '10px sans-serif';
+      this.ctx.fillStyle = '#90A4AE';
+      const goodbyeAlpha = progress < 0.2 ? (progress - 0.1) / 0.1 :
+                           progress > 0.75 ? (0.85 - progress) / 0.1 : 1;
+      this.ctx.globalAlpha = goodbyeAlpha * 0.7;
+      this.ctx.fillText('goodbye...', cx, floatY - 16);
+    }
 
-    // Subtle dotted line below (like a gentle wave goodbye)
-    if (progress > 0.2 && progress < 0.8) {
-      const lineAlpha = textAlpha * 0.4;
+    // Name — larger, with soft glow
+    this.ctx.globalAlpha = textAlpha;
+    this.ctx.shadowColor = '#FFFFFF';
+    this.ctx.shadowBlur = 8;
+    this.ctx.font = 'bold 16px sans-serif';
+    this.ctx.fillStyle = '#FFFFFF';
+    this.ctx.fillText(this.farewellName, cx, floatY);
+    this.ctx.shadowBlur = 0;
+
+    // Light particles rising from where the name is (like the spirit departing)
+    if (progress > 0.15 && progress < 0.9) {
+      const particleProgress = (progress - 0.15) / 0.75;
+      const particleAlpha = (1 - particleProgress) * 0.6;
+      this.ctx.globalAlpha = particleAlpha;
+      this.ctx.fillStyle = '#E0E0E0';
+      for (let i = 0; i < 10; i++) {
+        const angle = (i / 10) * Math.PI * 2 + progress * 2;
+        const dist = 10 + particleProgress * 50 + Math.sin(i * 3.7) * 15;
+        const px = cx + Math.cos(angle) * dist;
+        const py = floatY + Math.sin(angle) * dist * 0.5 - particleProgress * 30;
+        const size = (1 - particleProgress) * 1.5;
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, size, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
+
+    // Subtle dotted line (a gentle wave goodbye)
+    if (progress > 0.2 && progress < 0.75) {
+      const lineAlpha = textAlpha * 0.3;
       this.ctx.globalAlpha = lineAlpha;
       this.ctx.strokeStyle = '#FFFFFF';
       this.ctx.lineWidth = 0.5;
       this.ctx.setLineDash([2, 4]);
       this.ctx.beginPath();
-      const lineW = 40;
-      this.ctx.moveTo(CANVAS_WIDTH / 2 - lineW, floatY + 8);
-      this.ctx.lineTo(CANVAS_WIDTH / 2 + lineW, floatY + 8);
+      const lineW = 50 + progress * 20;
+      this.ctx.moveTo(cx - lineW, floatY + 12);
+      this.ctx.lineTo(cx + lineW, floatY + 12);
       this.ctx.stroke();
       this.ctx.setLineDash([]);
+    }
+
+    // Phase 3: Soft white fade at the very end (returning to the world of light)
+    if (progress > 0.85) {
+      const fadeAlpha = (progress - 0.85) / 0.15 * 0.3;
+      this.ctx.globalAlpha = fadeAlpha;
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 
     this.ctx.restore();

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { StoredState, CreatureData, WorldData, MonitorState, AgentData } from '../types';
+import { StoredState, CreatureData, WorldData, MonitorState, AgentData, STORED_STATE_VERSION } from '../types';
 import { STORAGE_KEY } from '../constants';
 
 export class CreatureStorage {
@@ -7,6 +7,7 @@ export class CreatureStorage {
 
   save(creatures: readonly CreatureData[], world: WorldData, monitorState: MonitorState, agents: readonly AgentData[]): void {
     const state: StoredState = {
+      version: STORED_STATE_VERSION,
       creatures,
       world,
       monitorState,
@@ -32,7 +33,8 @@ export class CreatureStorage {
     };
     // Ensure agents field exists for backward compatibility
     const agents: readonly AgentData[] = (raw as { agents?: readonly AgentData[] }).agents ?? [];
-    return { ...raw, world, agents };
+    const version = (raw as { version?: number }).version ?? 1;
+    return { ...raw, version, world, agents };
   }
 
   clear(): void {

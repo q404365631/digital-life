@@ -1,7 +1,7 @@
 {
   "name": "shikakeru-digital-life",
   "displayName": "Digital Life by SHIKAKERU",
-  "description": "Your code becomes a world. Digital creatures live in your VS Code, reflecting the health of your codebase.",
+  "description": "Your code becomes a world. Digital creatures live in your VS Code, reflecting the health of your codebase. Uses ipinfo.io for geolocation and Open-Meteo for weather data (no API key required, no personal data stored).",
   "version": "0.1.0",
   "publisher": "shikakeru",
   "license": "MIT",

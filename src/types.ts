@@ -196,11 +196,14 @@ export interface AgentData {
 // --- Storage ---
 
 export interface StoredState {
+  readonly version: number;
   readonly creatures: readonly CreatureData[];
   readonly world: WorldData;
   readonly monitorState: MonitorState;
   readonly agents: readonly AgentData[];
 }
+
+export const STORED_STATE_VERSION = 1;
 
 // --- Sprite ---
 
