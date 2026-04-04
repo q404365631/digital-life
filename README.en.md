@@ -1,43 +1,81 @@
 # Digital Life
 
-**Your code is alive.**
+**What if you could *feel* your code — without reading a single line?**
 
 <!-- TODO: Place demo GIF/video here -->
 <!-- ![Digital Life Demo](assets/demo.gif) -->
 
 ---
 
-## Your Code Has a Life of Its Own
+## This Is a Prototype of a New Interface
 
-We've always treated code as text files.
-But code has health. It grows. It ages. It decays.
+AI has become too powerful.
 
-Digital Life makes that invisible life visible.
+Non-engineers can now build entire systems. Tell an AI agent "build me this," and folders appear, files are created, code is written.
 
-Creatures are born from the files you write.
-When your code is healthy, they walk around happily.
-When bugs pile up, they look sad.
+But that person can't read code.
 
-This is not a tool.
-**It's a new relationship with your code.**
+They stare at 100 files in a folder and have no idea what's healthy and what's broken. A dashboard says "Bug count: 12" — but what does that *feel* like?
+
+**What if files were living creatures?**
+
+Healthy creatures run around happily. Sick creatures look miserable. That alone tells you the state of your system — without reading a single line of code.
+
+This is the idea at the core of Digital Life.
 
 ---
 
-## Why Creatures?
+## The UI Hasn't Changed in 30 Years
 
-Dashboards deliver information, but not emotion.
+Folders. Files. Menu bars. Windows.
 
-"Bug count: 12" doesn't move anyone.
-But when a creature you named is visibly suffering—
-you naturally want to fix the code.
+For three decades, the fundamental interface of computing hasn't changed. Humans have been adapting to the structure of computers.
 
-**Converting human empathy into an interface.**
-That is the design philosophy of Digital Life.
+It should be the other way around.
 
-In the age of AI agents writing code,
-the line between human-written and AI-written code is blurring.
-That's exactly why we need a new interface that lets you
-*feel* code health, not just read it.
+**Computers should adapt to human cognition.**
+
+Humans respond to emotion over numbers. Visuals over text. Ecosystems over lists.
+
+Digital Life translates the file system into a living ecosystem. This is not a productivity tool. **It's a reinvention of the interface itself.**
+
+---
+
+## The Future I See
+
+You open your computer. One AI agent is there.
+
+"What do you want to build?"
+
+You answer a few questions. The optimal system is constructed for you. AI writes all the code. You never touch it.
+
+But behind the scenes, every file the AI creates becomes a living creature — walking, breathing, existing in a world.
+
+You watch that world.
+
+"That one looks sick. Let me feed it."
+
+That's all you do. When you feed it, the AI sends the optimal prompt to repair that file.
+
+**All you did was feed a creature. But the system is now healthier.**
+
+This is the new interface for an era where no one reads code.
+
+---
+
+## A Token Ecosystem
+
+Digital Life is not just visualization.
+
+The creature's health determines what it needs. What it needs determines what prompt the AI sends.
+
+- Healthy creature → no action needed → zero token cost
+- Sick creature → cure it → minimal, targeted prompt
+- Overweight creature → diet → file gets split
+
+**No wasted tokens.** The creature's state naturally guides optimal resource allocation.
+
+This isn't an "AI cost management dashboard." It's human instinct — the desire to keep creatures healthy — naturally optimizing token usage.
 
 ---
 
@@ -49,15 +87,14 @@ That's exactly why we need a new interface that lets you
 | Save code | Health check runs, sparkle effect |
 | `git commit` | All creatures are nourished, golden light rains down |
 | Leave `// TODO` | Skies darken, creatures grow anxious |
-| Leave `console.log()` or `: any` | Bugs increase, creature health worsens |
+| Leave bugs unfixed | Creature health worsens |
 | Delete a file | The creature dissolves into particles of light |
 
 ---
 
 ## 6 Species
 
-Different species are born based on file extensions.
-Each has unique colors, voice, and personality.
+Files created by AI agents become different species based on their extension. Each has a unique appearance, voice, and personality.
 
 | Species | Files | Personality |
 |---|---|---|
@@ -68,44 +105,42 @@ Each has unique colors, voice, and personality.
 | **Chomp** | `.rs` `.c` `.cpp` `.h` | Hungry and tough |
 | **Dot** | `.ts` `.tsx` `.js` `.jsx` | Cool and intelligent |
 
-Custom species mapping is available via `.digital-life.json`.
+Six species means you can see at a glance: "Lots of Python files," "The TypeScript ones are struggling" — all without reading code.
 
 ---
 
-## Caring for Creatures
+## Care = Optimal Instructions to AI
 
-Click a creature to have AI diagnose its file's health
-and suggest a specific prescription.
+Click a creature and AI diagnoses its health, suggesting a prescription.
 
-| Prescription | What It Does | Triggered When |
+| Prescription | What Happens | When Needed |
 |---|---|---|
-| **Feed** | Nourish the creature | Anytime |
+| **Feed** | Nourish | Anytime |
 | **Cure** | Fix bugs | Bugs detected |
-| **Diet** | Split large files | File exceeds 400 lines |
-| **Untangle** | Reduce nesting depth | Nesting deeper than 4 levels |
-| **Split** | Break apart long functions | Function exceeds 50 lines |
-| **Wake** | Review stale files | No updates for 7+ days |
+| **Diet** | Split files | Over 400 lines |
+| **Untangle** | Reduce nesting | Too complex |
+| **Split** | Break apart functions | Functions too large |
+| **Wake** | Review stale files | 7+ days untouched |
 
-Approve the prescription and an AI agent executes it in the terminal.
+You just press "Yes." Behind the scenes, the AI agent executes the optimal prompt for that symptom.
+
+**It looks like you're caring for a creature. But you're actually giving precise instructions to AI.** This is system operations for an era where no one reads code.
 
 ---
 
-## Coexisting with AI Agents
+## Visualizing AI Agents
 
-Summon AI agents into your world as voxel robots.
+AI agents (Claude, Cursor, Copilot) exist in the world as voxel robots.
 
-- **3 agent types** — Claude, Cursor, Copilot
-- Add with the **+ Agent** button, click to switch between them
+When an agent is writing code, fixing bugs, or patrolling — you can see it moving.
 
-**Humans and AI, sharing the same space.**
-We believe that's what the future of development looks like.
+**No more anxiety about what AI is doing behind the scenes.** Humans and AI, sharing the same space, in the same world.
 
 ---
 
 ## Personality (Coding DNA)
 
-Your git history is analyzed into 5 DNA traits
-that shape creature behavior and dialogue:
+Your git history is analyzed into 5 DNA traits that shape creature behavior and dialogue:
 
 | Trait | Meaning |
 |---|---|
@@ -115,33 +150,13 @@ that shape creature behavior and dialogue:
 | **Swift** | Coding velocity |
 | **Steady** | Regularity of habits |
 
-Your DNA creates an ecosystem that is uniquely yours.
+Even with the same tool, your ecosystem is unlike anyone else's.
 
 ---
 
 ## Weather & Time
 
-Real-world weather and time of day are reflected in the world.
-
-- Rain outside means rain in your world, with drifting clouds
-- Night falls, the sky darkens
-- More bugs worsen the weather
-
-Your code's world is connected to your reality.
-
----
-
-## Toolbar
-
-| Button | Function |
-|---|---|
-| 🍞 **Feed** | Activate feed mode |
-| 🩺 **Care** | AI diagnosis → suggest prescription |
-| **+ Agent** | Add an AI agent to the world |
-| 🔄 | Switch between agents |
-| 📷 | Save a screenshot |
-| **EN** | Cycle language (6 supported) |
-| 🔊 / 🔇 | Toggle sound on/off |
+Real-world weather and time are reflected in the world. Rain outside means rain inside. Night falls, the sky darkens. Your reality and your code's world are connected.
 
 ---
 
@@ -149,30 +164,31 @@ Your code's world is connected to your reality.
 
 | Action | How |
 |---|---|
-| Select creature | Click (also opens file in editor) |
+| Select creature | Click (also opens file) |
 | Move creature | Drag |
 | Feed | 🍞 → click creature |
-| Care | 🩺 → click creature → approve prescription |
+| Care | 🩺 → click creature → approve |
+| Add agent | + Agent button |
+| Screenshot | 📷 button |
+| Language | JA button (6 languages) |
+| Sound | 🔊 / 🔇 button |
 | Zoom | Mouse wheel / pinch |
 | Pan | Right-click drag / two-finger scroll |
-| Reset zoom | Double-click |
 
 ---
 
 ## Settings
 
-Available in VS Code settings (`Ctrl+,`):
-
 | Setting | Description | Default |
 |---|---|---|
-| `digitalLife.realWeather` | Reflect real-world weather | `true` |
-| `digitalLife.language` | UI language (auto follows VS Code) | `auto` |
-| `digitalLife.sound` | Enable sound effects | `true` |
-| `digitalLife.saveReaction` | Sparkle effect on file save | `true` |
+| `digitalLife.realWeather` | Reflect real weather | `true` |
+| `digitalLife.language` | UI language | `auto` |
+| `digitalLife.sound` | Sound effects | `true` |
+| `digitalLife.saveReaction` | Save sparkle effect | `true` |
 
 ---
 
-## Supported Languages
+## Languages
 
 English · 日本語 · 繁體中文 · 简体中文 · 한국어 · Español
 
@@ -187,21 +203,13 @@ npm install
 npm run build
 ```
 
-Press **F5** in VS Code to launch the Extension Development Host.
-The **DIGITAL LIFE** tab appears in the bottom panel.
-
-Create a source file. Your first creature will be born.
+Press **F5** in VS Code → **DIGITAL LIFE** appears in the bottom panel.
 
 ---
 
 ## Tech Stack
 
-- TypeScript + Webpack
-- VS Code Webview API
-- Canvas 2D rendering (pixel art style)
-- chokidar (file watching)
-- simple-git (commit detection & DNA analysis)
-- Open-Meteo API (weather) · ipinfo.io (geolocation)
+TypeScript · Webpack · VS Code Webview API · Canvas 2D · chokidar · simple-git · Open-Meteo API · ipinfo.io
 
 *No API key required. No personal data stored.*
 
@@ -214,7 +222,8 @@ MIT — [SHIKAKERU Inc.](https://smartkenpai.com)
 ---
 
 <p align="center">
-  <strong>Code is not text. It's alive.</strong>
+  <strong>Code is not text. It's alive.</strong><br>
+  <strong>That's why you can understand it — even without reading a single line.</strong>
 </p>
 
 <p align="center">
