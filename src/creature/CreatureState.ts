@@ -89,7 +89,7 @@ export function createCreature(sourceFile: string, name: string, species: Specie
     exp: 0,
     level: 1,
     dna: dna ?? defaultDNA(),
-    fileHealth: { lineCount: 0, bugCount: 0, lastModified: Date.now() },
+    fileHealth: { lineCount: 0, bugCount: 0, lastModified: Date.now(), maxNesting: 0, longestFunction: 0 },
   };
 }
 

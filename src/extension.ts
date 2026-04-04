@@ -261,77 +261,46 @@ export function activate(context: vscode.ExtensionContext): void {
     lastSuggestionTime = now;
   }
 
-  // ── Feature C: Morning Briefing ──────────────────────────────
+  // ── Feature C: Morning Wake-up (creature-driven, no AI narrator) ──
   let morningSent = false;
 
-  function sendMorningDiary(): void {
+  function sendMorningWakeUp(): void {
     if (morningSent) return;
     morningSent = true;
 
     const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
     if (all.length === 0) return;
 
-    // Collect health stats across all creatures
-    const sickCreatures: { name: string; bugs: number }[] = [];
-    const tiredCreatures: { name: string; days: number }[] = [];
-    const heavyCreatures: { name: string; lines: number }[] = [];
-    let totalBugs = 0;
+    // Find the creature that needs the most help (worst health first)
+    let worstCreature: CreatureData | null = null;
+    let worstScore = Infinity;
 
     for (const c of all) {
       const h = c.fileHealth;
-      const daysSince = Math.floor((Date.now() - h.lastModified) / 864e5);
-      totalBugs += h.bugCount;
-      if (h.bugCount > 0) { sickCreatures.push({ name: c.name, bugs: h.bugCount }); }
-      if (daysSince > 3) { tiredCreatures.push({ name: c.name, days: daysSince }); }
-      if (h.lineCount > 300) { heavyCreatures.push({ name: c.name, lines: h.lineCount }); }
-    }
+      const daysSince = (Date.now() - h.lastModified) / 864e5;
+      // Lower score = worse health
+      let score = 100;
+      if (h.bugCount > 0) score -= h.bugCount * 20;
+      if (h.lineCount > 300) score -= 30;
+      if ((h.maxNesting ?? 0) > 8) score -= 25;
+      if ((h.longestFunction ?? 0) > 80) score -= 20;
+      if (daysSince > 3) score -= 20;
+      score -= (100 - c.hunger) * 0.3;
 
-    const unhealthyCount = sickCreatures.length + tiredCreatures.length + heavyCreatures.length;
-
-    // Build briefing message
-    let entry: string;
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? (speechLang === 'ja' ? 'おはようございます' : 'Good morning')
-                   : hour < 18 ? (speechLang === 'ja' ? 'こんにちは' : 'Good afternoon')
-                   : (speechLang === 'ja' ? 'こんばんは' : 'Good evening');
-
-    if (speechLang === 'ja') {
-      if (unhealthyCount === 0) {
-        entry = `${greeting}！みんな元気です！${all.length}体の子たちが待ってましたよ`;
-      } else {
-        const parts: string[] = [];
-        if (sickCreatures.length > 0) {
-          parts.push(`${sickCreatures.length}体がバグで体調悪いみたい`);
-        }
-        if (tiredCreatures.length > 0) {
-          parts.push(`${tiredCreatures.length}体がしばらく触ってもらえてない`);
-        }
-        if (heavyCreatures.length > 0) {
-          parts.push(`${heavyCreatures.length}体がちょっと重そう`);
-        }
-        entry = `${greeting}！${parts.join('、')}。見てあげますか？`;
-      }
-    } else {
-      if (unhealthyCount === 0) {
-        entry = `${greeting}! Everyone is healthy! ${all.length} friends are waiting for you`;
-      } else {
-        const parts: string[] = [];
-        if (sickCreatures.length > 0) {
-          parts.push(`${sickCreatures.length} feeling sick (bugs)`);
-        }
-        if (tiredCreatures.length > 0) {
-          parts.push(`${tiredCreatures.length} feeling lonely (untouched)`);
-        }
-        if (heavyCreatures.length > 0) {
-          parts.push(`${heavyCreatures.length} feeling heavy (large files)`);
-        }
-        entry = `${greeting}! ${parts.join(', ')}. Want to check on them?`;
+      if (score < worstScore) {
+        worstScore = score;
+        worstCreature = c;
       }
     }
 
-    // Send as diary to the first creature (it speaks on behalf of all)
-    const creature = all[0];
-    panelProvider.postMessage({ type: 'diary', creatureId: creature.id, entry });
+    // Let creatures speak for themselves via their existing mood bubbles.
+    // If there's a creature in trouble, nudge the user toward it.
+    if (worstCreature && worstScore < 70) {
+      panelProvider.postMessage({
+        type: 'nudgeCreature',
+        creatureId: worstCreature.id,
+      });
+    }
   }
 
   // Monitor manager
@@ -463,6 +432,12 @@ export function activate(context: vscode.ExtensionContext): void {
           } else if (health.lineCount > 300) {
             action = 'diet';
             description = `${health.lineCount}行 → 200行以下にリファクタリングします`;
+          } else if ((health.maxNesting ?? 0) > 8) {
+            action = 'untangle';
+            description = `ネスト${health.maxNesting}段 → 早期リターンで浅くします`;
+          } else if ((health.longestFunction ?? 0) > 80) {
+            action = 'split';
+            description = `${health.longestFunction}行の関数 → 小さく分割します`;
           } else if (daysSince > 3) {
             action = 'wake';
             description = `${Math.floor(daysSince)}日間放置 → レビューして最新化します`;
@@ -672,7 +647,7 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'ready':
         sendWorldUpdate();
         if (!isFirstRun) {
-          setTimeout(() => sendMorningDiary(), 2000);
+          setTimeout(() => sendMorningWakeUp(), 2000);
           broadcastSpeech(getTimeOfDaySpeechEvent());
         }
         setTimeout(() => updateFriendships(), 3000);
@@ -956,6 +931,20 @@ export function activate(context: vscode.ExtensionContext): void {
           `${relativePath}をレビューしてください。このファイルは長期間更新されていません。` +
           `不要なコードがあれば削除し、古いパターンがあれば最新のベストプラクティスに更新してください。` +
           `deprecatedなAPIがあれば最新版に移行してください。`
+        );
+        break;
+      case 'untangle':
+        terminal.sendText(
+          `${relativePath}のネストが深すぎます（最大${health.maxNesting}段）。` +
+          `早期リターン（guard clause）パターンを使ってネストを浅くしてください。` +
+          `条件を反転してreturnし、ネストを最大3段までに抑えてください。`
+        );
+        break;
+      case 'split':
+        terminal.sendText(
+          `${relativePath}に${health.longestFunction}行の長い関数があります。` +
+          `この関数を20-30行の小さな関数に分割してください。` +
+          `各関数は1つの責務だけを持つようにし、適切な名前をつけてください。`
         );
         break;
     }

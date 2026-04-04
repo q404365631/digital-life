@@ -394,6 +394,8 @@ export class SpriteRenderer {
     if (h.bugCount > 2)         return t('bubble_sick');
     if (h.lineCount > 500)      return t('bubble_very_heavy');
     if (h.lineCount > 400)      return t('bubble_heavy');
+    if ((h.maxNesting ?? 0) > 8) return t('bubble_tangled');
+    if ((h.longestFunction ?? 0) > 80) return t('bubble_bloated');
     if (stale > 10)             return t('bubble_abandoned');
     if (stale > 5)              return t('bubble_sleepy');
     if (creature.happiness > 80 && h.bugCount === 0 && h.lineCount < 200) return t('bubble_perfect');

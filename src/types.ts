@@ -14,6 +14,8 @@ export interface FileHealth {
   readonly lineCount: number;
   readonly bugCount: number;
   readonly lastModified: number; // epoch ms
+  readonly maxNesting: number;      // deepest indentation level
+  readonly longestFunction: number; // lines in the longest function
 }
 
 // --- Creature ---
@@ -129,6 +131,7 @@ export type ExtToWebMessage =
   | { readonly type: 'creatureSuggestion'; readonly creatureId: string; readonly creatureName: string; readonly action: string; readonly description: string }
   | { readonly type: 'friendships'; readonly pairs: readonly { a: string; b: string }[] }
   | { readonly type: 'diary'; readonly creatureId: string; readonly entry: string }
+  | { readonly type: 'nudgeCreature'; readonly creatureId: string }
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
   | { readonly type: 'levelUp'; readonly creatureId: string }
   | { readonly type: 'agentAdded'; readonly agentId: string }

@@ -42,8 +42,13 @@ export const EXCLUDED_PATTERNS = [
 
 export const BUG_PATTERNS = [
   /\/\/\s*TODO/gi,
+  /\/\/\s*FIXME/gi,
+  /\/\/\s*HACK/gi,
+  /\/\/\s*XXX/gi,
   /console\.log\s*\(/g,
   /:\s*any\b/g,
+  /debugger\b/g,
+  /eslint-disable(?!-next-line)/g,
 ];
 
 export const STORAGE_KEY = 'digitalLife.state';

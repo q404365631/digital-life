@@ -439,10 +439,19 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
     }
 
     case 'diary': {
-      // Feature C: Morning Briefing — show as speech on the creature + TTS
+      // Legacy — kept for compat but no longer triggered by morning briefing
       eventSpeechOverrides.set(message.creatureId, { text: message.entry, timestamp: Date.now() });
-      soundEngine.playMorning();
-      soundEngine.speak(message.entry);
+      break;
+    }
+
+    case 'nudgeCreature': {
+      // Morning wake-up: gently highlight the creature that needs attention.
+      // The creature's own mood bubble (hungry/sick/etc.) speaks for itself — no AI narrator.
+      const nudgeTarget = creatures.find(c => c.id === message.creatureId);
+      if (nudgeTarget) {
+        renderer.triggerFeedEffect(nudgeTarget.position.x, nudgeTarget.position.y);
+        soundEngine.playSelectAgent();
+      }
       break;
     }
 

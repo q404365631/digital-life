@@ -18,6 +18,7 @@ interface HealthSnapshot {
   sick:      number;
   heavy:     number;
   sleepy:    number;
+  tangled:   number;
   score:     number;   // 0-100 "vibe check"
   avgLevel:  number;
 }
@@ -33,17 +34,18 @@ export class UIRenderer {
     const active = creatures.filter(c => c.stage !== 'egg');
     if (active.length === 0) { this.snap = null; return; }
 
-    let happy = 0, sick = 0, heavy = 0, sleepy = 0, lvSum = 0;
+    let happy = 0, sick = 0, heavy = 0, sleepy = 0, tangled = 0, lvSum = 0;
 
     for (const c of active) {
       const h = c.fileHealth;
       lvSum += c.level;
       const stale = (Date.now() - h.lastModified) / 864e5; // days
 
-      if (h.bugCount > 0)       { sick++;   }
-      else if (h.lineCount > 300){ heavy++;  }
-      else if (stale > 3)       { sleepy++; }
-      else                      { happy++;  }
+      if (h.bugCount > 0)                          { sick++;    }
+      else if (h.lineCount > 300)                   { heavy++;   }
+      else if ((h.maxNesting ?? 0) > 8 || (h.longestFunction ?? 0) > 80) { tangled++; }
+      else if (stale > 3)                           { sleepy++;  }
+      else                                          { happy++;   }
     }
 
     const n = active.length;
@@ -52,7 +54,7 @@ export class UIRenderer {
 
     this.snap = {
       total: creatures.length,
-      happy, sick, heavy, sleepy,
+      happy, sick, heavy, sleepy, tangled,
       score,
       avgLevel: Math.round(lvSum / n * 10) / 10,
     };
@@ -91,7 +93,8 @@ export class UIRenderer {
     const s = this.snap;
     if (!s) return;
 
-    const W = 120, H = 58;
+    const hasTangled = s.tangled > 0;
+    const W = 120, H = hasTangled ? 70 : 58;
     const px = CANVAS_WIDTH - W - 8;
     const py = 36;
 
@@ -124,10 +127,13 @@ export class UIRenderer {
     };
 
     const ry = py + 33;
-    row(px + 6,  ry,      t('hr_great'),  s.happy,  '#8bc34a');
-    row(px + 64, ry,      t('hr_sick'),   s.sick,   '#ef5350');
-    row(px + 6,  ry + 12, t('hr_heavy'),  s.heavy,  '#ffa726');
-    row(px + 64, ry + 12, t('hr_sleepy'), s.sleepy, '#90a4ae');
+    row(px + 6,  ry,      t('hr_great'),  s.happy,   '#8bc34a');
+    row(px + 64, ry,      t('hr_sick'),   s.sick,    '#ef5350');
+    row(px + 6,  ry + 12, t('hr_heavy'),  s.heavy,   '#ffa726');
+    row(px + 64, ry + 12, t('hr_sleepy'), s.sleepy,  '#90a4ae');
+    if (hasTangled) {
+      row(px + 6, ry + 24, t('hr_tangled'), s.tangled, '#ab47bc');
+    }
 
     this.ctx.restore();
   }

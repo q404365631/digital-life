@@ -30,10 +30,63 @@ export class CodeAnalyzer {
       const stat = fs.statSync(filePath);
       const lastModified = stat.mtimeMs;
 
-      return { lineCount, bugCount, lastModified };
+      // Static analysis: nesting depth and longest function
+      const maxNesting = this.measureMaxNesting(lines);
+      const longestFunction = this.measureLongestFunction(lines);
+
+      return { lineCount, bugCount, lastModified, maxNesting, longestFunction };
     } catch {
-      return { lineCount: 0, bugCount: 0, lastModified: Date.now() };
+      return { lineCount: 0, bugCount: 0, lastModified: Date.now(), maxNesting: 0, longestFunction: 0 };
     }
+  }
+
+  /** Measure deepest indentation level (proxy for cyclomatic complexity). */
+  private measureMaxNesting(lines: string[]): number {
+    let maxDepth = 0;
+    let depth = 0;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Count brace-based nesting (works for JS/TS/Go/Rust/Java/C)
+      for (const ch of trimmed) {
+        if (ch === '{') depth++;
+        if (ch === '}') depth = Math.max(0, depth - 1);
+      }
+      if (depth > maxDepth) maxDepth = depth;
+    }
+    return maxDepth;
+  }
+
+  /** Measure the longest function/method body in lines. */
+  private measureLongestFunction(lines: string[]): number {
+    let longest = 0;
+    let currentStart = -1;
+    let braceDepth = 0;
+    const funcPattern = /^\s*(?:export\s+)?(?:async\s+)?(?:function|const\s+\w+\s*=|(?:public|private|protected)\s+)/;
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+
+      if (funcPattern.test(trimmed) && currentStart === -1) {
+        currentStart = i;
+      }
+
+      for (const ch of trimmed) {
+        if (ch === '{') {
+          if (currentStart === -1) currentStart = i;
+          braceDepth++;
+        }
+        if (ch === '}') {
+          braceDepth--;
+          if (braceDepth <= 0 && currentStart !== -1) {
+            const length = i - currentStart + 1;
+            if (length > longest) longest = length;
+            currentStart = -1;
+            braceDepth = 0;
+          }
+        }
+      }
+    }
+    return longest;
   }
 
   private countBugs(content: string): number {
