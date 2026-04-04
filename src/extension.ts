@@ -541,49 +541,19 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
-        outputChannel.appendLine(`[addAgent] rawType="${rawType}" keys=${Object.keys(message).join(',')}`);
-        outputChannel.show(true); // auto-show Output panel so user can see logs
+        outputChannel.appendLine(`[addAgent] rawType="${rawType}"`);
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
-          const allTerminals = vscode.window.terminals;
-          const activeTermName = vscode.window.activeTerminal?.name ?? 'none';
-          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'} active="${activeTermName}" total=${allTerminals.length}`);
+          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'}`);
 
           if (switchTerminal && !switchTerminal.exitStatus) {
-            // Terminal switching: show terminal, then explicitly focus it
+            // Direct approach: just show the terminal (no outputChannel.show to interfere)
             switchTerminal.show(false);
-            outputChannel.appendLine(`[switch] terminal.show(false) called for "${switchTerminal.name}"`);
-
-            // Also try VS Code command to ensure terminal panel has focus
-            void (async () => {
-              await new Promise(r => setTimeout(r, 150));
-              // Check if show() alone worked
-              const currentActive = vscode.window.activeTerminal?.name ?? 'none';
-              outputChannel.appendLine(`[switch] after show(): activeTerminal="${currentActive}" target="${switchTerminal.name}"`);
-
-              if (vscode.window.activeTerminal !== switchTerminal) {
-                // show() didn't switch the tab — cycle through terminals
-                outputChannel.appendLine(`[switch] show() didn't work, cycling terminals...`);
-                await vscode.commands.executeCommand('workbench.action.terminal.focus');
-                await new Promise(r => setTimeout(r, 100));
-
-                for (let i = 0; i < allTerminals.length; i++) {
-                  const active = vscode.window.activeTerminal;
-                  outputChannel.appendLine(`[switch] cycle ${i}: active="${active?.name ?? 'none'}"`);
-                  if (active === switchTerminal) {
-                    outputChannel.appendLine(`[switch] FOUND target at cycle ${i}`);
-                    break;
-                  }
-                  await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
-                  await new Promise(r => setTimeout(r, 100));
-                }
-              }
-              outputChannel.appendLine(`[switch] DONE. activeTerminal="${vscode.window.activeTerminal?.name ?? 'none'}"`);
-            })();
+            outputChannel.appendLine(`[switch] terminal.show(false) done`);
           } else {
-            outputChannel.appendLine(`[switch] terminal not found or exited. agentTerminals keys: [${[...agentTerminals.keys()].join(', ')}]`);
+            outputChannel.appendLine(`[switch] NOT FOUND. keys: [${[...agentTerminals.keys()].join(', ')}]`);
           }
           agentManager.selectAgent(switchId);
           sendWorldUpdate();
