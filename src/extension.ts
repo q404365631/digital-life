@@ -77,7 +77,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Status bar item — always visible feedback
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
-  statusBarItem.command = 'digitalLife.adoptFiles';
+  statusBarItem.command = 'digitalLife.focusWeakest';
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
@@ -1013,6 +1013,37 @@ export function activate(context: vscode.ExtensionContext): void {
       if (count > 0) {
         syncAndSave();
       }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('digitalLife.focusWeakest', async () => {
+      const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
+      if (all.length === 0) {
+        // No creatures — fall back to adopt
+        await vscode.commands.executeCommand('digitalLife.adoptFiles');
+        return;
+      }
+
+      // Find the creature with the worst health (highest urgency)
+      let worst = all[0];
+      let worstScore = 0;
+      for (const c of all) {
+        let score = 0;
+        if (c.hunger < 15) score += 50;
+        else if (c.hunger < 30) score += 40;
+        score += c.fileHealth.bugCount * 10;
+        if ((c.fileHealth.maxNesting ?? 0) > 4) score += 5;
+        if ((c.fileHealth.longestFunction ?? 0) > 50) score += 5;
+        if (score > worstScore) {
+          worstScore = score;
+          worst = c;
+        }
+      }
+
+      // Open the file in the editor
+      const uri = vscode.Uri.file(worst.sourceFile);
+      await vscode.window.showTextDocument(uri, { preview: true });
     })
   );
 

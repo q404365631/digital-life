@@ -184,7 +184,7 @@ export class UIRenderer {
 
   // ── Commit celebration ──
 
-  renderCommitEffect(progress: number, streak: number = 0): void {
+  renderCommitEffect(progress: number, streak: number = 0, combo: number = 0): void {
     if (progress <= 0) return;
 
     const cx = CANVAS_WIDTH / 2;
@@ -214,6 +214,24 @@ export class UIRenderer {
     this.ctx.fillText(t('committed'), cx, cy - 30);
     this.ctx.shadowBlur = 0;
 
+    // Combo badge (2+ commits in session)
+    if (combo >= 2) {
+      this.ctx.globalAlpha = Math.min(1, progress * 2);
+      const comboScale = 1 + Math.sin(Date.now() / 100) * 0.1; // pulse
+      const fontSize = Math.min(24, 14 + combo * 2);
+      this.ctx.font = `bold ${fontSize}px sans-serif`;
+      const comboColor = combo >= 10 ? '#FF4500' : combo >= 5 ? '#FF6B6B' : '#FFD700';
+      this.ctx.shadowColor = comboColor;
+      this.ctx.shadowBlur = 16 * comboScale;
+      this.ctx.fillStyle = comboColor;
+      this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      this.ctx.lineWidth = 3;
+      const comboText = `${combo} COMBO!`;
+      this.ctx.strokeText(comboText, cx, cy - 10);
+      this.ctx.fillText(comboText, cx, cy - 10);
+      this.ctx.shadowBlur = 0;
+    }
+
     // Streak badge (if any)
     if (streak >= 7) {
       this.ctx.globalAlpha = Math.min(1, progress * 2);
@@ -221,7 +239,8 @@ export class UIRenderer {
       const tierLabel = streak >= 100 ? '\u{1F525} LEGEND' : streak >= 30 ? '\u{1F3C6} GOLD' : '\u2B50 SILVER';
       this.ctx.font = 'bold 11px sans-serif';
       this.ctx.fillStyle = tierColor;
-      this.ctx.fillText(`${tierLabel} \u2014 ${streak}-day streak`, cx, cy - 12);
+      const streakY = combo >= 2 ? cy + 8 : cy - 12;
+      this.ctx.fillText(`${tierLabel} \u2014 ${streak}-day streak`, cx, streakY);
     }
 
     // Phase 2 (0.7→0.0): Expanding ring burst

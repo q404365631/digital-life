@@ -28,6 +28,7 @@ export class GameRenderer {
   private commitEffectStart: number = 0;
   private readonly COMMIT_EFFECT_DURATION = 3000;
   private commitStreak: number = 0;
+  private commitCombo: number = 0;
 
   // Firework particles for commit celebration
   private fireworks: { x: number; y: number; vx: number; vy: number; color: string; born: number; life: number }[] = [];
@@ -77,10 +78,11 @@ export class GameRenderer {
     this.uiRenderer.updateHealthCache(creatures);
   }
 
-  triggerCommitEffect(streak: number = 0): void {
+  triggerCommitEffect(streak: number = 0, combo: number = 0): void {
     this.commitEffectProgress = 1.0;
     this.commitEffectStart = Date.now();
     this.commitStreak = streak;
+    this.commitCombo = combo;
 
     // Spawn firework particles — more for longer streaks
     const count = 30 + Math.min(streak, 50) * 2;
@@ -276,7 +278,7 @@ export class GameRenderer {
     this.updateCommitEffect();
     if (this.commitEffectProgress > 0) {
       this.renderFireworks();
-      this.uiRenderer.renderCommitEffect(this.commitEffectProgress, this.commitStreak);
+      this.uiRenderer.renderCommitEffect(this.commitEffectProgress, this.commitStreak, this.commitCombo);
     }
 
     // Farewell overlay (UI layer — screen dims, name floats away)

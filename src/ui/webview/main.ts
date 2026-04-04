@@ -337,6 +337,9 @@ const eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = n
 // Feature D: Friendship pairs (creature ID pairs from import analysis)
 let friendshipPairs: readonly { a: string; b: string }[] = [];
 
+// Session commit combo counter
+let sessionCommitCount = 0;
+
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
 type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
@@ -379,10 +382,12 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
     }
 
-    case 'commitDetected':
-      renderer.triggerCommitEffect(message.stats?.streak ?? 0);
+    case 'commitDetected': {
+      sessionCommitCount++;
+      renderer.triggerCommitEffect(message.stats?.streak ?? 0, sessionCommitCount);
       soundEngine.playCommit();
       break;
+    }
 
     case 'levelUp': {
       // Level-up celebration — sparkle effect on the creature
