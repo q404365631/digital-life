@@ -1,5 +1,5 @@
-import { CreatureData, Species, Position, CodingDNA, FileHealth } from '../types';
-import { MAX_CREATURES } from '../constants';
+import { CreatureData, Species, Position, CodingDNA, FileHealth, MutationType } from '../types';
+import { MAX_CREATURES, NEGLECT_DEATH_DAYS, NEGLECT_WARNING_DAYS, MS_PER_DAY } from '../constants';
 import {
   createCreature,
   updateHatchProgress,
@@ -166,6 +166,45 @@ export class CreatureManager {
       if (creature.targetPosition) {
         this.creatures.set(id, { ...creature, targetPosition: null });
       }
+    }
+  }
+
+  /** Check for neglected creatures. Returns { critical, dead } creature lists */
+  checkNeglect(): { critical: CreatureData[]; dead: CreatureData[] } {
+    const now = Date.now();
+    const critical: CreatureData[] = [];
+    const dead: CreatureData[] = [];
+
+    for (const [id, creature] of this.creatures) {
+      if (creature.stage === 'egg') continue;
+
+      const daysSinceLastFed = (now - creature.lastFed) / MS_PER_DAY;
+
+      if (daysSinceLastFed >= NEGLECT_DEATH_DAYS) {
+        dead.push(creature);
+      } else if (daysSinceLastFed >= NEGLECT_WARNING_DAYS && !creature.neglectWarned) {
+        critical.push(creature);
+        this.creatures.set(id, { ...creature, neglectWarned: true });
+      }
+    }
+
+    return { critical, dead };
+  }
+
+  /** Remove a creature by ID (for neglect death) */
+  removeCreatureById(id: string): CreatureData | null {
+    const creature = this.creatures.get(id);
+    if (!creature) return null;
+    this.creatures.delete(id);
+    this.fileToCreatureId.delete(creature.sourceFile);
+    return creature;
+  }
+
+  /** Set mutation on a creature */
+  setMutation(creatureId: string, mutation: MutationType): void {
+    const creature = this.creatures.get(creatureId);
+    if (creature) {
+      this.creatures.set(creatureId, { ...creature, mutation });
     }
   }
 

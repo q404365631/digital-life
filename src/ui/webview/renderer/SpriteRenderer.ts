@@ -220,6 +220,25 @@ export class SpriteRenderer {
       return;
     }
 
+    // Mutation visual effects
+    if (creature.mutation && creature.stage !== 'egg') {
+      this.renderMutationEffect(creature, renderSize);
+    }
+
+    // Neglect warning — creature flickers red when close to death
+    if (creature.neglectWarned) {
+      const flash = Math.sin(Date.now() / 200) > 0;
+      if (flash) {
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillStyle = '#FF0000';
+        this.ctx.beginPath();
+        this.ctx.arc(creature.position.x, creature.position.y, renderSize / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+      }
+    }
+
     // Level badge (always visible) + name & path (selected only)
     if (creature.stage !== 'egg') {
       const cx = creature.position.x;
@@ -832,6 +851,114 @@ export class SpriteRenderer {
     this.ctx.bezierCurveTo(x, y + size, x + size, y + size * 0.7, x + size, y + size * 0.3);
     this.ctx.bezierCurveTo(x + size, y, x, y, x, y + size * 0.3);
     this.ctx.fill();
+  }
+
+  /** Render mutation-specific visual effects around a creature */
+  private renderMutationEffect(creature: CreatureData, renderSize: number): void {
+    const cx = creature.position.x;
+    const cy = creature.position.y;
+    const time = Date.now() / 1000;
+    const r = renderSize / 2;
+
+    this.ctx.save();
+
+    switch (creature.mutation) {
+      case 'nightGlow': {
+        // Eyes glow bright in the dark — pulsing white/yellow aura from center
+        const pulse = 0.4 + Math.sin(time * 2) * 0.2;
+        const gradient = this.ctx.createRadialGradient(cx, cy - 2, 2, cx, cy - 2, r + 4);
+        gradient.addColorStop(0, `rgba(255, 255, 200, ${pulse})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy - 2, r + 4, 0, Math.PI * 2);
+        this.ctx.fill();
+        break;
+      }
+      case 'rainbow': {
+        // Rainbow shimmer ring — rotating hue
+        const hue = (time * 60) % 360;
+        this.ctx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.5)`;
+        this.ctx.lineWidth = 1.5;
+        this.ctx.shadowColor = `hsla(${hue}, 100%, 60%, 0.8)`;
+        this.ctx.shadowBlur = 6;
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+        this.ctx.stroke();
+        // Sparkle particles
+        for (let i = 0; i < 3; i++) {
+          const angle = time * 1.5 + (i * Math.PI * 2) / 3;
+          const px = cx + Math.cos(angle) * (r + 5);
+          const py = cy + Math.sin(angle) * (r + 5);
+          this.ctx.fillStyle = `hsla(${(hue + i * 120) % 360}, 100%, 70%, 0.8)`;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+        break;
+      }
+      case 'speedster': {
+        // Afterimage / speed lines trailing behind
+        this.ctx.globalAlpha = 0.15;
+        for (let i = 1; i <= 3; i++) {
+          const offsetX = -i * 3 * (creature.animationState === 'walk_right' ? 1 : creature.animationState === 'walk_left' ? -1 : 0);
+          const offsetY = -i * 3 * (creature.animationState === 'walk_down' ? 1 : creature.animationState === 'walk_up' ? -1 : 0);
+          if (offsetX !== 0 || offsetY !== 0) {
+            this.ctx.fillStyle = '#87CEEB';
+            this.ctx.beginPath();
+            this.ctx.arc(cx + offsetX, cy + offsetY, r - i, 0, Math.PI * 2);
+            this.ctx.fill();
+          }
+        }
+        // Speed lines when moving
+        if (creature.targetPosition) {
+          this.ctx.globalAlpha = 0.3;
+          this.ctx.strokeStyle = '#FFFFFF';
+          this.ctx.lineWidth = 1;
+          for (let i = 0; i < 4; i++) {
+            const ly = cy - r + i * (r * 2 / 3);
+            this.ctx.beginPath();
+            this.ctx.moveTo(cx - r - 4 - Math.random() * 3, ly);
+            this.ctx.lineTo(cx - r - 8 - Math.random() * 5, ly);
+            this.ctx.stroke();
+          }
+        }
+        break;
+      }
+      case 'zen': {
+        // Calm aura — soft rings pulsing outward
+        for (let i = 0; i < 3; i++) {
+          const phase = (time + i * 0.8) % 2.4;
+          const radius = r + phase * 6;
+          const alpha = Math.max(0, 0.3 - phase * 0.125);
+          this.ctx.strokeStyle = `rgba(144, 238, 144, ${alpha})`;
+          this.ctx.lineWidth = 1;
+          this.ctx.beginPath();
+          this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          this.ctx.stroke();
+        }
+        break;
+      }
+      case 'hyperactive': {
+        // Sparkle burst — constant tiny particles
+        this.ctx.globalAlpha = 0.7;
+        const colors = ['#FFD700', '#FF6B6B', '#4FC3F7', '#81C784'];
+        for (let i = 0; i < 5; i++) {
+          const seed = (time * 3 + i * 1.7) % 1;
+          const angle = (time * 2 + i * 1.3) % (Math.PI * 2);
+          const dist = r + seed * 8;
+          const px = cx + Math.cos(angle) * dist;
+          const py = cy + Math.sin(angle) * dist - seed * 6;
+          this.ctx.fillStyle = colors[i % colors.length];
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 1 + seed, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+        break;
+      }
+    }
+
+    this.ctx.restore();
   }
 
   renderInteractionHeart(

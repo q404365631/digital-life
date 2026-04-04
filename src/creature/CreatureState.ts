@@ -1,11 +1,11 @@
-import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, Species, CodingDNA } from '../types';
+import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, Species, CodingDNA, MutationType } from '../types';
 import { defaultDNA } from './DNAAnalyzer';
 import { getPersonality, Personality } from '../ai/SpeechTemplates';
 import {
   CANVAS_WIDTH, CANVAS_HEIGHT, SPRITE_SIZE,
   HUNGER_DECAY_RATE, HAPPINESS_DECAY_RATE,
   FEED_AMOUNT, PET_AMOUNT, HATCH_DURATION,
-  CREATURE_SPEED,
+  CREATURE_SPEED, MUTATION_UNLOCK_LEVEL,
 } from '../constants';
 
 function generateId(): string {
@@ -41,19 +41,48 @@ const STAGE_RANK: Record<CreatureStage, number> = {
   adult: 2,
 };
 
+/** Determine mutation based on dominant DNA trait */
+export function determineMutation(dna: CodingDNA): MutationType {
+  const traits: { key: keyof CodingDNA; mutation: MutationType }[] = [
+    { key: 'nightOwl', mutation: 'nightGlow' },
+    { key: 'polyglot', mutation: 'rainbow' },
+    { key: 'velocity', mutation: 'speedster' },
+    { key: 'consistency', mutation: 'zen' },
+    { key: 'commitFrequency', mutation: 'hyperactive' },
+  ];
+
+  // Find the dominant trait (highest value >= 0.6)
+  let best: { mutation: MutationType; value: number } = { mutation: null, value: 0.6 };
+  for (const t of traits) {
+    if (dna[t.key] > best.value) {
+      best = { mutation: t.mutation, value: dna[t.key] };
+    }
+  }
+  return best.mutation;
+}
+
 export function addExp(creature: CreatureData, amount: number): CreatureData {
   const newExp = creature.exp + amount;
   const newLevel = calculateLevel(newExp);
+  const prevLevel = creature.level;
   const calculatedStage = calculateStage(newLevel);
   // Prevent stage regression: keep current stage if it outranks the calculated one
   const newStage = STAGE_RANK[calculatedStage] >= STAGE_RANK[creature.stage]
     ? calculatedStage
     : creature.stage;
+
+  // Check for mutation unlock at level threshold
+  let mutation = creature.mutation;
+  if (!mutation && newLevel >= MUTATION_UNLOCK_LEVEL && prevLevel < MUTATION_UNLOCK_LEVEL) {
+    mutation = determineMutation(creature.dna);
+  }
+
   return {
     ...creature,
     exp: newExp,
     level: newLevel,
     stage: newStage,
+    mutation,
   };
 }
 
@@ -82,6 +111,8 @@ export function createCreature(sourceFile: string, name: string, species: Specie
     level: 1,
     dna: dna ?? defaultDNA(),
     fileHealth: { lineCount: 0, bugCount: 0, lastModified: Date.now(), maxNesting: 0, longestFunction: 0 },
+    mutation: null,
+    neglectWarned: false,
   };
 }
 
@@ -143,6 +174,7 @@ export function feedCreature(creature: CreatureData): CreatureData {
     lastFed: Date.now(),
     reactionType: 'feed',
     reactionTimer: REACTION_DURATION,
+    neglectWarned: false,
   };
 }
 

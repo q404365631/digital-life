@@ -61,4 +61,11 @@ export const LINE_COUNT_OBESE = 400;
 export const LINE_COUNT_CRITICAL = 500;
 export const STALE_DAYS = 3;
 
+// Neglect death — creature dies if not fed for this many days
+export const NEGLECT_DEATH_DAYS = 3;
+export const NEGLECT_WARNING_DAYS = 2;
+
+// Mutation unlock level
+export const MUTATION_UNLOCK_LEVEL = 5;
+
 export const STORAGE_KEY = 'digitalLife.state';

@@ -64,7 +64,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const savedState = storage.load();
   let isFirstRun = false;
   if (savedState) {
-    creatureManager.loadCreatures(savedState.creatures);
+    // Backfill new creature fields for saved states from older versions
+    const backfilledCreatures = savedState.creatures.map(c => ({
+      ...c,
+      mutation: (c as any).mutation ?? null,
+      neglectWarned: (c as any).neglectWarned ?? false,
+    }));
+    creatureManager.loadCreatures(backfilledCreatures);
     // Backfill new WorldData fields for saved states from older versions
     worldState = {
       ...savedState.world,
@@ -428,6 +434,11 @@ export function activate(context: vscode.ExtensionContext): void {
       for (const id of leveledUp) {
         panelProvider.postMessage({ type: 'levelUp', creatureId: id });
         broadcastSpeech('levelUp', id);
+        // Check if mutation was unlocked
+        const leveledCreature = creatureManager.getById(id);
+        if (leveledCreature?.mutation) {
+          panelProvider.postMessage({ type: 'mutationUnlocked', creatureId: id, mutation: leveledCreature.mutation });
+        }
       }
       broadcastSpeech('commit');
       syncAndSave();
@@ -1053,6 +1064,48 @@ export function activate(context: vscode.ExtensionContext): void {
   // Slow-tick counter for periodic checks (friendship, proactive care)
   let slowTickCounter = 0;
 
+  /** Check for neglected creatures — warn at 2 days, kill at 3 days */
+  function checkNeglect(): void {
+    const { critical, dead } = creatureManager.checkNeglect();
+
+    // Warning notifications (2 days without feeding)
+    for (const creature of critical) {
+      void vscode.window.showWarningMessage(
+        `⚠️ ${creature.name} が危篤です！早くfeedしないと明日には...`,
+        'パネルを開く'
+      ).then(choice => {
+        if (choice === 'パネルを開く') {
+          void vscode.commands.executeCommand('digitalLife.showPanel');
+        }
+      });
+      panelProvider.postMessage({ type: 'creatureCritical', creatureId: creature.id, creatureName: creature.name });
+    }
+
+    // Death by neglect (3 days without feeding)
+    for (const creature of dead) {
+      const removed = creatureManager.removeCreatureById(creature.id);
+      if (removed) {
+        worldState = addGraveStone(
+          worldState,
+          removed.name,
+          removed.species,
+          removed.bornAt,
+          removed.sourceFile,
+          removed.position,
+        );
+        panelProvider.postMessage({
+          type: 'creatureDied',
+          creatureId: removed.id,
+          creatureName: removed.name,
+        });
+        void vscode.window.showErrorMessage(
+          `💀 ${removed.name} は餓死しました...墓石が残されています。`
+        );
+        syncAndSave();
+      }
+    }
+  }
+
   function tickAll(): void {
     creatureManager.tick(TICK_INTERVAL);
     agentManager.tick();
@@ -1070,6 +1123,7 @@ export function activate(context: vscode.ExtensionContext): void {
       updateFriendships();       // Feature D
       checkProactiveSuggestions(); // Feature E
       checkLateNight();
+      checkNeglect();            // Neglect death system
       if (vscode.workspace.getConfiguration('digitalLife').get<boolean>('realWeather', true)) {
         void fetchRealWeather();
       }

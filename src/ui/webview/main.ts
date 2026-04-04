@@ -399,6 +399,26 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
     }
 
+    case 'creatureCritical': {
+      // Critical warning — creature is about to die from neglect
+      const critCreature = creatures.find(c => c.id === message.creatureId);
+      if (critCreature) {
+        renderer.triggerWorsenEffect(critCreature.position.x, critCreature.position.y);
+        soundEngine.playError();
+      }
+      break;
+    }
+
+    case 'mutationUnlocked': {
+      // Mutation unlocked — sparkle celebration
+      const mutCreature = creatures.find(c => c.id === message.creatureId);
+      if (mutCreature) {
+        renderer.triggerFeedEffect(mutCreature.position.x, mutCreature.position.y);
+        soundEngine.playLevelUp();
+      }
+      break;
+    }
+
     case 'creatureHealed': {
       // Recovery effect — creature-specific green sparkles + healing bubble
       const healedCreature = creatures.find(c => c.id === message.creatureId);

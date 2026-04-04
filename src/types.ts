@@ -21,6 +21,8 @@ export interface FileHealth {
 // --- Creature ---
 
 export type Species = 'puff' | 'blob' | 'pip' | 'wisp' | 'chomp' | 'dot';
+
+export type MutationType = 'nightGlow' | 'rainbow' | 'speedster' | 'zen' | 'hyperactive' | null;
 export type CreatureStage = 'egg' | 'baby' | 'adult';
 export type CreatureMood = 'happy' | 'neutral' | 'sad';
 
@@ -66,6 +68,8 @@ export interface CreatureData {
   readonly level: number;
   readonly dna: CodingDNA;
   readonly fileHealth: FileHealth;
+  readonly mutation: MutationType;
+  readonly neglectWarned: boolean;  // true if critical notification already shown
 }
 
 // --- World ---
@@ -156,6 +160,8 @@ export type ExtToWebMessage =
   | { readonly type: 'creatureHealed'; readonly creatureId: string; readonly creatureName: string }
   | { readonly type: 'creatureWorsened'; readonly creatureId: string }
   | { readonly type: 'creatureSpeech'; readonly creatureId: string; readonly text: string }
+  | { readonly type: 'creatureCritical'; readonly creatureId: string; readonly creatureName: string }
+  | { readonly type: 'mutationUnlocked'; readonly creatureId: string; readonly mutation: MutationType }
   | { readonly type: 'creatureSuggestion'; readonly creatureId: string; readonly creatureName: string; readonly action: string; readonly description: string }
   | { readonly type: 'friendships'; readonly pairs: readonly { a: string; b: string }[] }
   | { readonly type: 'nudgeCreature'; readonly creatureId: string }
