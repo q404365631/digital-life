@@ -158,10 +158,13 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);
     console.log(`[DL-WV] pointerdown: agentHit=${agentHit} (${agentDist.toFixed(1)}), creatureHit=${creatureHit} (${creatureDist.toFixed(1)}), agents.length=${agents.length}`);
 
-    // Agent wins tie (larger sprite, harder to miss)
-    // Do NOT call setPointerCapture here — it kills the click event.
-    // Pointer capture is deferred to pointermove if actual drag starts.
+    // Agent tap: send selectAgent immediately from pointerdown
+    // (Pixel Agents pattern: detect + message in same handler, no pointer capture)
     if (agentHit && agentDist <= creatureDist) {
+      selectedAgentId = agentHit;
+      renderer.setSelectedAgentId(agentHit);
+      soundEngine.playSelectAgent();
+      vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
       draggingAgentId = agentHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
