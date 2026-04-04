@@ -583,6 +583,29 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     return;
   }
 
+  // Check if clicking on the profile badge/card (UI layer, not affected by zoom)
+  if (selectedCreatureId) {
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = (event.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+    const canvasY = (event.clientY - rect.top) * (CANVAS_HEIGHT / rect.height);
+
+    if (renderer.isProfileCardOpen()) {
+      // Full card area (bottom-left) — click to close
+      const cardW = 160, cardH = 120;
+      if (canvasX >= 6 && canvasX <= 6 + cardW && canvasY >= CANVAS_HEIGHT - cardH - 6 && canvasY <= CANVAS_HEIGHT - 6) {
+        renderer.toggleProfileCard();
+        return;
+      }
+    } else {
+      // Badge area — click to open
+      const badge = renderer.getProfileBadgeRect();
+      if (canvasX >= badge.x && canvasX <= badge.x + badge.w && canvasY >= badge.y && canvasY <= badge.y + badge.h) {
+        renderer.toggleProfileCard();
+        return;
+      }
+    }
+  }
+
   // Find nearest creature AND agent — pick whichever is closest
   const { id: creatureHit, dist: creatureDist } = findCreatureAtCanvasPosWithDist(worldPos.x, worldPos.y);
   const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);

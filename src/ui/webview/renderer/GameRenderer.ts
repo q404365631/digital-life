@@ -71,9 +71,25 @@ export class GameRenderer {
   private shootingStars: { x: number; y: number; vx: number; vy: number; life: number; born: number; length: number }[] = [];
   private lastShootingStarSpawn = 0;
 
+  // Profile card toggle (default: collapsed)
+  private profileCardOpen = false;
+
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.spriteRenderer = new SpriteRenderer(ctx);
     this.uiRenderer = new UIRenderer(ctx);
+  }
+
+  toggleProfileCard(): void {
+    this.profileCardOpen = !this.profileCardOpen;
+  }
+
+  isProfileCardOpen(): boolean {
+    return this.profileCardOpen;
+  }
+
+  /** Get the hit area for the collapsed profile badge (for click detection) */
+  getProfileBadgeRect(): { x: number; y: number; w: number; h: number } {
+    return { x: 6, y: CANVAS_HEIGHT - 26, w: 80, h: 20 };
   }
 
   setSelectedAgentId(id: string | null): void {
@@ -277,15 +293,17 @@ export class GameRenderer {
     this.uiRenderer.renderBugCount(bugCount);
     this.uiRenderer.renderWeatherIndicator(world.realWeather, world.timeOfDay);
 
+    // Profile card: collapsed badge or full card (bottom-left, togglable)
     if (selectedCreatureId) {
       const selectedCreature = creatures.find(c => c.id === selectedCreatureId);
       if (selectedCreature) {
-        this.uiRenderer.renderProfileCard(selectedCreature);
+        if (this.profileCardOpen) {
+          this.uiRenderer.renderProfileCard(selectedCreature);
+        } else {
+          this.uiRenderer.renderProfileBadge(selectedCreature);
+        }
       }
     }
-
-    // Code health report (uses cached stats)
-    this.uiRenderer.renderHealthReport();
 
     // Commit celebration (UI layer)
     this.updateCommitEffect();

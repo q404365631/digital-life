@@ -291,10 +291,37 @@ export class UIRenderer {
 
   // ── Profile Card (selected creature detail view) ──
 
+  /** Compact badge — click to expand */
+  renderProfileBadge(creature: CreatureData): void {
+    const px = 6, py = CANVAS_HEIGHT - 26, W = 80, H = 20;
+
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(10, 10, 20, 0.7)';
+    this.roundPill(px, py, W, H, 6);
+
+    // Species color dot
+    const colors: Record<string, string> = {
+      dot: '#666', puff: '#FFB6C1', blob: '#87CEEB',
+      pip: '#FFD700', wisp: '#DDA0DD', chomp: '#90EE90',
+    };
+    this.ctx.fillStyle = colors[creature.species] ?? '#888';
+    this.ctx.beginPath();
+    this.ctx.arc(px + 12, py + 10, 4, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // Name + Lv
+    this.ctx.fillStyle = '#CCC';
+    this.ctx.font = '8px sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`${creature.name} Lv.${creature.level}`, px + 19, py + 13);
+
+    this.ctx.restore();
+  }
+
   renderProfileCard(creature: CreatureData): void {
     const W = 160, H = 120;
-    const px = (CANVAS_WIDTH - W) / 2;
-    const py = CANVAS_HEIGHT - H - 36; // above toolbar
+    const px = 6;
+    const py = CANVAS_HEIGHT - H - 6;
 
     this.ctx.save();
 
