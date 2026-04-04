@@ -46,6 +46,10 @@ export class GameRenderer {
   private worsenEffects: { x: number; y: number; startTime: number }[] = [];
   private readonly WORSEN_EFFECT_DURATION = 1200;
 
+  // Save sparkle effect (file saved → creature shines)
+  private saveEffects: { x: number; y: number; startTime: number }[] = [];
+  private readonly SAVE_EFFECT_DURATION = 1000;
+
   // Farewell scene (file deletion)
   private farewellName: string | null = null;
   private farewellStart: number = 0;
@@ -98,6 +102,10 @@ export class GameRenderer {
 
   triggerWorsenEffect(worldX: number, worldY: number): void {
     this.worsenEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
+  }
+
+  triggerSaveEffect(worldX: number, worldY: number): void {
+    this.saveEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
   }
 
   triggerHealEffect(worldX: number, worldY: number, creatureId?: string): void {
@@ -208,6 +216,9 @@ export class GameRenderer {
 
     // Draw worsen effects (red flash)
     this.renderWorsenEffects();
+
+    // Draw save sparkle effects (file saved → creature shines)
+    this.renderSaveEffects();
 
     // Draw interaction hearts between nearby creatures
     this.renderInteractionHearts(creatures);
@@ -723,6 +734,64 @@ export class GameRenderer {
         this.ctx.fillStyle = gradient;
         this.ctx.beginPath();
         this.ctx.arc(effect.x, effect.y, 20, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      this.ctx.restore();
+    }
+  }
+
+  /** File-save sparkle — a quick golden twinkle when a file is saved */
+  private renderSaveEffects(): void {
+    const now = Date.now();
+    this.saveEffects = this.saveEffects.filter(e => now - e.startTime < this.SAVE_EFFECT_DURATION);
+
+    for (const effect of this.saveEffects) {
+      const elapsed = now - effect.startTime;
+      const progress = elapsed / this.SAVE_EFFECT_DURATION;
+      this.ctx.save();
+
+      // Phase 1 (0→0.3): Quick white flash ring
+      if (progress < 0.3) {
+        const ringProgress = progress / 0.3;
+        const radius = 4 + ringProgress * 14;
+        this.ctx.globalAlpha = (1 - ringProgress) * 0.7;
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 2 - ringProgress * 1.5;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+
+      // Phase 2 (0.1→0.8): Golden sparkle particles radiating out
+      if (progress > 0.1 && progress < 0.8) {
+        const sparkleProgress = (progress - 0.1) / 0.7;
+        this.ctx.globalAlpha = (1 - sparkleProgress) * 0.8;
+        const colors = ['#FFD700', '#FFF176', '#FFEB3B', '#FFE082'];
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2 + progress * 3;
+          const dist = 5 + sparkleProgress * 18;
+          const sx = effect.x + Math.cos(angle) * dist;
+          const sy = effect.y + Math.sin(angle) * dist;
+          this.ctx.fillStyle = colors[i % colors.length];
+          // Star-shaped sparkle
+          const size = (1 - sparkleProgress) * 2.5;
+          this.ctx.beginPath();
+          this.ctx.arc(sx, sy, size, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      }
+
+      // Phase 3 (0→0.5): Soft golden glow under creature
+      if (progress < 0.5) {
+        const glowAlpha = (1 - progress / 0.5) * 0.2;
+        this.ctx.globalAlpha = glowAlpha;
+        const gradient = this.ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, 16);
+        gradient.addColorStop(0, '#FFD700');
+        gradient.addColorStop(1, 'transparent');
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, 16, 0, Math.PI * 2);
         this.ctx.fill();
       }
 

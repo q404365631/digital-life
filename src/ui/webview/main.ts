@@ -323,6 +323,7 @@ const btnFeed = document.getElementById('btn-feed');
 const btnCare = document.getElementById('btn-care');
 const btnMute = document.getElementById('btn-mute');
 const btnLang = document.getElementById('btn-lang');
+const btnScreenshot = document.getElementById('btn-screenshot');
 const feedIndicator = document.getElementById('feed-mode-indicator');
 const eduMessage = document.getElementById('edu-message');
 
@@ -407,6 +408,30 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       if (worsenedCreature) {
         renderer.triggerWorsenEffect(worsenedCreature.position.x, worsenedCreature.position.y);
         soundEngine.playError();
+      }
+      break;
+    }
+
+    case 'fileSaved': {
+      // File saved → golden sparkle on the creature
+      const savedCreature = creatures.find(c => c.id === message.creatureId);
+      if (savedCreature) {
+        renderer.triggerSaveEffect(savedCreature.position.x, savedCreature.position.y);
+      }
+      break;
+    }
+
+    case 'settings': {
+      // Apply settings from VS Code configuration
+      if (message.language && message.language !== 'auto') {
+        setLanguage(message.language as import('./i18n').Language);
+        applyToolbarLabels();
+      }
+      if (typeof message.sound === 'boolean') {
+        soundEngine.setMuted(!message.sound);
+        if (btnMute) {
+          btnMute.textContent = message.sound ? '\u{1F50A}' : '\u{1F507}';
+        }
       }
       break;
     }
@@ -611,6 +636,21 @@ btnLang?.addEventListener('click', () => {
   vscode.setState({ ...(vscode.getState() as object ?? {}), language: newLang });
 });
 
+// Screenshot button — capture canvas and send to extension for saving/sharing
+btnScreenshot?.addEventListener('click', () => {
+  const imageData = canvas.toDataURL('image/png');
+  vscode.postMessage({ type: 'screenshot', imageData });
+  // Brief flash effect as feedback
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0.6;pointer-events:none;z-index:999;transition:opacity 0.3s';
+  const wrapper = document.getElementById('canvas-wrapper');
+  wrapper?.appendChild(flash);
+  requestAnimationFrame(() => {
+    flash.style.opacity = '0';
+    setTimeout(() => flash.remove(), 300);
+  });
+});
+
 /** Refresh all toolbar labels/tooltips for current language */
 function applyToolbarLabels(): void {
   const lang = getLanguage();
@@ -620,6 +660,7 @@ function applyToolbarLabels(): void {
   if (btnMute)    { const m = soundEngine.isMuted(); btnMute.textContent = m ? t('tt_unmute') : t('tt_mute'); btnMute.title = m ? t('tt_unmute') : t('tt_mute'); }
   const addAgent = document.getElementById('btn-add-agent');
   if (addAgent)   { addAgent.textContent = '+ ' + t('tt_add_agent'); addAgent.title = t('tt_add_agent'); }
+  if (btnScreenshot) { btnScreenshot.title = t('tt_screenshot'); }
 }
 
 // ============================================================

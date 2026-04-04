@@ -367,6 +367,11 @@ export function activate(context: vscode.ExtensionContext): void {
       const savedCreatureId = creatureManager.getByFile(filePath);
       if (savedCreatureId) {
         broadcastSpeech('save', savedCreatureId);
+        // Save sparkle — golden twinkle on the affected creature
+        const config = vscode.workspace.getConfiguration('digitalLife');
+        if (config.get<boolean>('saveReaction', true)) {
+          panelProvider.postMessage({ type: 'fileSaved', creatureId: savedCreatureId });
+        }
       }
       // Bug count is updated via onBugCountChanged
       // If any agent is running, briefly show generating status
@@ -645,14 +650,17 @@ export function activate(context: vscode.ExtensionContext): void {
         // Ensure timeOfDay is fresh on startup
         worldState = updateTimeOfDay(worldState);
         sendWorldUpdate();
+        sendSettings(); // Sync VS Code settings to webview
         if (!isFirstRun) {
           setTimeout(() => sendMorningWakeUp(), 2000);
           broadcastSpeech(getTimeOfDaySpeechEvent());
         }
         setTimeout(() => updateFriendships(), 3000);
         startTimeOfDayTimer();
-        // Fetch real weather immediately on startup
-        void fetchRealWeather();
+        // Fetch real weather (if enabled in settings)
+        { const cfg = vscode.workspace.getConfiguration('digitalLife');
+          if (cfg.get<boolean>('realWeather', true)) { void fetchRealWeather(); }
+        }
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
@@ -675,10 +683,39 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  function handleUtilityMessage(message: WebToExtMessage): boolean {
+    switch (message.type) {
+      case 'screenshot': {
+        // Save screenshot as PNG file and offer to share
+        const imageData = message.imageData;
+        const base64 = imageData.replace(/^data:image\/png;base64,/, '');
+        const buffer = Buffer.from(base64, 'base64');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `digital-life-${timestamp}.png`;
+        const filePath = path.join(workspacePath, fileName);
+        fs.writeFileSync(filePath, buffer);
+        void vscode.window.showInformationMessage(
+          `📷 Screenshot saved: ${fileName}`,
+          'Open', 'Copy Path'
+        ).then(choice => {
+          if (choice === 'Open') {
+            void vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+          } else if (choice === 'Copy Path') {
+            void vscode.env.clipboard.writeText(filePath);
+          }
+        });
+        return true;
+      }
+      default:
+        return false;
+    }
+  }
+
   panelProvider.onMessage((message) => {
     handleCreatureMessage(message)
       || handleAgentMessage(message)
-      || handleLifecycleMessage(message);
+      || handleLifecycleMessage(message)
+      || handleUtilityMessage(message);
   });
 
   // Terminal close handler for agents — terminal closed = agent leaves the plaza
@@ -799,6 +836,26 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  // ── VS Code settings sync ──
+  function sendSettings(): void {
+    const config = vscode.workspace.getConfiguration('digitalLife');
+    panelProvider.postMessage({
+      type: 'settings',
+      realWeather: config.get<boolean>('realWeather', true),
+      language: config.get<string>('language', 'auto'),
+      sound: config.get<boolean>('sound', true),
+      saveReaction: config.get<boolean>('saveReaction', true),
+    });
+  }
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('digitalLife')) {
+        sendSettings();
+      }
+    })
+  );
+
   // Slow-tick counter for periodic checks (friendship, proactive care)
   let slowTickCounter = 0;
 
@@ -819,7 +876,9 @@ export function activate(context: vscode.ExtensionContext): void {
       updateFriendships();       // Feature D
       checkProactiveSuggestions(); // Feature E
       checkLateNight();
-      void fetchRealWeather();
+      if (vscode.workspace.getConfiguration('digitalLife').get<boolean>('realWeather', true)) {
+        void fetchRealWeather();
+      }
     }
   }
 

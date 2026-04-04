@@ -148,6 +148,8 @@ export type ExtToWebMessage =
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
   | { readonly type: 'levelUp'; readonly creatureId: string }
   | { readonly type: 'agentAdded'; readonly agentId: string }
+  | { readonly type: 'fileSaved'; readonly creatureId: string }
+  | { readonly type: 'settings'; readonly realWeather: boolean; readonly language: string; readonly sound: boolean; readonly saveReaction: boolean }
 
 export type WebToExtMessage =
   | { readonly type: 'ready' }
@@ -169,6 +171,7 @@ export type WebToExtMessage =
   | { readonly type: 'clearAllCreatures' }
   | { readonly type: 'revealFile'; readonly creatureId: string }
   | { readonly type: 'spawnFile'; readonly filePath: string; readonly name: string }
+  | { readonly type: 'screenshot'; readonly imageData: string }
 ;
 
 // --- Agent ---

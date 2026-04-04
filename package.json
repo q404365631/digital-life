@@ -70,7 +70,33 @@
         "command": "digitalLife.adoptFiles",
         "title": "Digital Life: Adopt Existing Files"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Digital Life",
+      "properties": {
+        "digitalLife.realWeather": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show real weather from Open-Meteo API"
+        },
+        "digitalLife.language": {
+          "type": "string",
+          "enum": ["auto", "en", "ja", "zh-TW", "zh-CN", "ko", "es"],
+          "default": "auto",
+          "description": "UI language (auto = follow VS Code language)"
+        },
+        "digitalLife.sound": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable sound effects"
+        },
+        "digitalLife.saveReaction": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show sparkle effect when files are saved"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
