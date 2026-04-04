@@ -230,28 +230,36 @@ export class SpriteRenderer {
         // ── Selected: name + Lv + file path ──
         this.ctx.save();
 
-        // Name + Lv line
+        // Name + species + Lv line
         const lvText = `Lv.${creature.level}`;
+        const speciesTag = `[${creature.species}]`;
         this.ctx.font = 'bold 9px sans-serif';
         const nameW = this.ctx.measureText(creature.name).width;
+        this.ctx.font = '7px sans-serif';
+        const speciesW = this.ctx.measureText(speciesTag).width;
         this.ctx.font = 'bold 7px sans-serif';
         const lvW = this.ctx.measureText(lvText).width;
-        const rowW = nameW + lvW + 6;
+        const rowW = nameW + speciesW + lvW + 10;
 
         this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
         this.ctx.beginPath();
         this.ctx.roundRect(cx - rowW / 2 - 4, baseY - 10, rowW + 8, 13, 4);
         this.ctx.fill();
 
+        const labelStartX = cx - rowW / 2;
+        this.ctx.textAlign = 'left';
+
         this.ctx.fillStyle = '#fff';
         this.ctx.font = 'bold 9px sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(creature.name, cx - lvW / 2, baseY);
+        this.ctx.fillText(creature.name, labelStartX, baseY);
+
+        this.ctx.fillStyle = '#888';
+        this.ctx.font = '7px sans-serif';
+        this.ctx.fillText(speciesTag, labelStartX + nameW + 3, baseY);
 
         this.ctx.fillStyle = lvColor;
         this.ctx.font = 'bold 7px sans-serif';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(lvText, cx + nameW / 2 - lvW / 2 + 3, baseY);
+        this.ctx.fillText(lvText, labelStartX + nameW + speciesW + 7, baseY);
 
         // File path
         const fullPath = creature.sourceFile;
