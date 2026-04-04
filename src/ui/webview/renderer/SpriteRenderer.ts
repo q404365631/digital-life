@@ -26,19 +26,12 @@ export class SpriteRenderer {
   // Event-driven speech overrides (Feature A: Living words)
   private eventSpeech: Map<string, string> = new Map();
 
-  // Lineup mode — show all labels (点呼)
-  private lineupMode = false;
-
   setHealedIds(ids: Set<string>): void {
     this.healedIds = ids;
   }
 
   setEventSpeech(overrides: Map<string, string>): void {
     this.eventSpeech = overrides;
-  }
-
-  setLineupMode(active: boolean): void {
-    this.lineupMode = active;
   }
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
@@ -224,8 +217,8 @@ export class SpriteRenderer {
       const baseY = creature.position.y - renderSize / 2 - 6;
       const lvColor = isAdult ? '#FFD700' : creature.stage === 'baby' ? '#90CAF9' : '#AAAAAA';
 
-      if (isSelected || this.lineupMode) {
-        // ── Selected / Lineup: name + Lv (+ file path if selected) ──
+      if (isSelected) {
+        // ── Selected: name + Lv + file path ──
         this.ctx.save();
 
         // Name + Lv line
@@ -251,26 +244,22 @@ export class SpriteRenderer {
         this.ctx.textAlign = 'left';
         this.ctx.fillText(lvText, cx + nameW / 2 - lvW / 2 + 3, baseY);
 
-        // File path — show for selected creature OR during lineup
-        if (isSelected || this.lineupMode) {
-          const fullPath = creature.sourceFile;
-          const shortPath = this.lineupMode
-            ? fullPath.split('/').pop() ?? fullPath  // Lineup: filename only (compact)
-            : fullPath.split('/').slice(-2).join('/'); // Selected: dir/filename
-          this.ctx.font = '7px sans-serif';
-          this.ctx.textAlign = 'center';
-          const pathW = this.ctx.measureText(shortPath).width;
+        // File path
+        const fullPath = creature.sourceFile;
+        const shortPath = fullPath.split('/').slice(-2).join('/');
+        this.ctx.font = '7px sans-serif';
+        this.ctx.textAlign = 'center';
+        const pathW = this.ctx.measureText(shortPath).width;
 
-          this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
-          this.ctx.beginPath();
-          this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
-          this.ctx.fill();
+        this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        this.ctx.beginPath();
+        this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
+        this.ctx.fill();
 
-          this.ctx.fillStyle = this.lineupMode ? '#B0BEC5' : '#90CAF9';
-          this.ctx.fillText(shortPath, cx, baseY - 13);
-        }
+        this.ctx.fillStyle = '#90CAF9';
+        this.ctx.fillText(shortPath, cx, baseY - 13);
 
-        if (isSelected) {
+        {
           // Selection ring
           this.ctx.strokeStyle = 'rgba(255,215,0,0.6)';
           this.ctx.lineWidth = 1.5;
@@ -279,18 +268,6 @@ export class SpriteRenderer {
           this.ctx.stroke();
         }
 
-        // Lineup: health indicator dot
-        if (this.lineupMode) {
-          const h = creature.fileHealth;
-          const dotColor = h.bugCount > 0 ? '#EF5350' :
-                           h.lineCount > 400 ? '#FFA726' :
-                           (h.maxNesting ?? 0) > 8 || (h.longestFunction ?? 0) > 80 ? '#AB47BC' :
-                           creature.hunger < 20 ? '#FFEE58' : '#66BB6A';
-          this.ctx.fillStyle = dotColor;
-          this.ctx.beginPath();
-          this.ctx.arc(cx + rowW / 2 + 6, baseY - 4, 3, 0, Math.PI * 2);
-          this.ctx.fill();
-        }
 
         this.ctx.restore();
       } else {

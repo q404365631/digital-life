@@ -593,69 +593,6 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
-  // ── Lineup (点呼) ─────────────────────────────────────────
-  let lineupIsActive = false;
-
-  function performLineup(): void {
-    // Toggle: click again to dismiss
-    if (lineupIsActive) {
-      dismissLineup();
-      return;
-    }
-
-    const allCreatures = creatureManager.getAll().filter(c => c.stage !== 'egg');
-    const allAgents = agentManager.getAll();
-    const totalEntities = allCreatures.length + allAgents.length;
-    if (totalEntities === 0) return;
-
-    // Grid layout: generous spacing so names/file labels don't overlap
-    const cols = Math.min(6, Math.max(3, Math.ceil(Math.sqrt(allCreatures.length))));
-    const rows = Math.ceil(allCreatures.length / cols);
-    const marginX = 40;
-    const marginTop = 55;  // room for file path + name labels above sprite
-    const marginBot = 70;  // room for agents at bottom
-    const usableW = CANVAS_WIDTH - marginX * 2;
-    const usableH = CANVAS_HEIGHT - marginTop - marginBot;
-    const cellW = usableW / Math.max(cols, 1);
-    const cellH = Math.min(60, usableH / Math.max(rows, 1));
-
-    // Place creatures in a grid, sorted by source file for easy scanning
-    const sorted = [...allCreatures].sort((a, b) => a.sourceFile.localeCompare(b.sourceFile));
-    sorted.forEach((c, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      creatureManager.setTargetPosition(c.id, {
-        x: marginX + cellW * (col + 0.5),
-        y: marginTop + cellH * (row + 0.5),
-      });
-    });
-
-    // Place agents in bottom row
-    const agentY = CANVAS_HEIGHT - 40;
-    const agentCellW = CANVAS_WIDTH / (allAgents.length + 1);
-    allAgents.forEach((a, i) => {
-      agentManager.setTargetPosition(a.id, {
-        x: agentCellW * (i + 1),
-        y: agentY,
-      });
-    });
-
-    lineupIsActive = true;
-    creatureManager.setLineupMode(true);
-    agentManager.setLineupMode(true);
-    panelProvider.postMessage({ type: 'lineupActive', active: true });
-    sendWorldUpdate();
-  }
-
-  function dismissLineup(): void {
-    creatureManager.setLineupMode(false);
-    agentManager.setLineupMode(false);
-    creatureManager.clearAllTargets();
-    agentManager.clearAllTargets();
-    lineupIsActive = false;
-    panelProvider.postMessage({ type: 'lineupActive', active: false });
-    sendWorldUpdate();
-  }
 
   function handleLifecycleMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
@@ -667,9 +604,6 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         setTimeout(() => updateFriendships(), 3000);
         startTimeOfDayTimer();
-        return true;
-      case 'lineup':
-        performLineup();
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {

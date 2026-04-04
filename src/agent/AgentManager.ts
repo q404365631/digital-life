@@ -22,9 +22,6 @@ function randomTarget(): Position {
 export class AgentManager {
   private agents: Map<string, AgentData> = new Map();
   private nextSpriteIndex: number = 0;
-  private _lineupMode = false;
-
-  setLineupMode(active: boolean): void { this._lineupMode = active; }
 
   getAll(): readonly AgentData[] {
     return Array.from(this.agents.values());
@@ -156,7 +153,7 @@ export class AgentManager {
 
       // Pick a new target randomly (more active than creatures)
       // Lineup mode: stay put after reaching target
-      if (!updated.targetPosition && !this._lineupMode && Math.random() < 0.02) {
+      if (!updated.targetPosition && Math.random() < 0.02) {
         updated = { ...updated, targetPosition: randomTarget() };
       }
 
@@ -171,9 +168,8 @@ export class AgentManager {
         } else {
           const nx = dx / dist;
           const ny = dy / dist;
-          // Running agents move faster; lineup mode = dash
-          const baseSpeed = updated.status === 'running' || updated.status === 'generating' ? AGENT_SPEED * 2 : AGENT_SPEED;
-          const speed = this._lineupMode ? baseSpeed * 30 : baseSpeed;
+          // Running agents move faster
+          const speed = updated.status === 'running' || updated.status === 'generating' ? AGENT_SPEED * 2 : AGENT_SPEED;
           updated = {
             ...updated,
             position: {

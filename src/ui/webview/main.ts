@@ -335,14 +335,6 @@ const eventSpeechOverrides: Map<string, { text: string; timestamp: number }> = n
 // Feature D: Friendship pairs (creature ID pairs from import analysis)
 let friendshipPairs: readonly { a: string; b: string }[] = [];
 
-// ── Lineup (点呼) ───────────────────────────────────────────
-let lineupActive = false;
-
-const btnLineup = document.getElementById('btn-lineup');
-btnLineup?.addEventListener('click', () => {
-  vscode.postMessage({ type: 'lineup' });
-});
-
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
 type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
@@ -464,11 +456,6 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       // Auto-select the newly added agent
       selectedAgentId = message.agentId;
       renderer.setSelectedAgentId(message.agentId);
-      break;
-    }
-
-    case 'lineupActive': {
-      lineupActive = message.active;
       break;
     }
 
@@ -630,7 +617,6 @@ function applyToolbarLabels(): void {
   if (btnMute)    { const m = soundEngine.isMuted(); btnMute.textContent = m ? t('tt_unmute') : t('tt_mute'); btnMute.title = m ? t('tt_unmute') : t('tt_mute'); }
   const addAgent = document.getElementById('btn-add-agent');
   if (addAgent)   { addAgent.textContent = '+ ' + t('tt_add_agent'); addAgent.title = t('tt_add_agent'); }
-  if (btnLineup)  { btnLineup.textContent = t('tt_lineup'); btnLineup.title = t('tt_lineup'); }
 }
 
 // ============================================================
@@ -1013,7 +999,7 @@ function gameLoop(timestamp: number): void {
         creatures: smoothCreatures, world: worldData, bugCount,
         zoom: zoomLevel, panX, panY,
         selectedCreatureId, draggingCreatureId,
-        agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs, lineupActive,
+        agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs,
       });
     }
   }
