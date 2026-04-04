@@ -642,6 +642,8 @@ export function activate(context: vscode.ExtensionContext): void {
   function handleLifecycleMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
       case 'ready':
+        // Ensure timeOfDay is fresh on startup
+        worldState = updateTimeOfDay(worldState);
         sendWorldUpdate();
         if (!isFirstRun) {
           setTimeout(() => sendMorningWakeUp(), 2000);
@@ -649,6 +651,8 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         setTimeout(() => updateFriendships(), 3000);
         startTimeOfDayTimer();
+        // Fetch real weather immediately on startup
+        void fetchRealWeather();
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
@@ -737,6 +741,7 @@ export function activate(context: vscode.ExtensionContext): void {
       else rw = null;
 
       worldState = updateRealWeather(worldState, rw);
+      sendWorldUpdate(); // Push updated weather to webview immediately
       outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code})`);
     } catch {
       // Network error — silently continue with null weather

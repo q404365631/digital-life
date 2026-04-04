@@ -256,12 +256,12 @@ export class GameRenderer {
   /** Background color palette — shifts with the real-world clock */
   private getTimeOfDayBackground(tod: TimeOfDay): string {
     switch (tod) {
-      case 'dawn':      return '#F0E6D8'; // warm peach
-      case 'morning':   return '#F5F0E8'; // bright cream (original)
-      case 'afternoon': return '#F2EDE3'; // slightly warm
-      case 'dusk':      return '#E8DDD0'; // amber warmth
-      case 'night':     return '#2A2A3A'; // deep blue-grey
-      default:          return '#F5F0E8';
+      case 'dawn':      return '#F5E6D0'; // warm peach sunrise
+      case 'morning':   return '#F0F5E8'; // bright green-tinted daylight
+      case 'afternoon': return '#F5EDD8'; // warm golden afternoon
+      case 'dusk':      return '#E0D0C0'; // deep amber sunset
+      case 'night':     return '#1E1E2E'; // deep navy night
+      default:          return '#F0F5E8';
     }
   }
 
