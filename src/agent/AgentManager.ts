@@ -155,7 +155,8 @@ export class AgentManager {
       }
 
       // Pick a new target randomly (more active than creatures)
-      if (!updated.targetPosition && Math.random() < 0.02) {
+      // Lineup mode: stay put after reaching target
+      if (!updated.targetPosition && !this._lineupMode && Math.random() < 0.02) {
         updated = { ...updated, targetPosition: randomTarget() };
       }
 

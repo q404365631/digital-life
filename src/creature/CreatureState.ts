@@ -259,6 +259,10 @@ export function updateCreatureMovement(creature: CreatureData, speedBoost = 1): 
   const speed = CREATURE_SPEED * speedMultiplier * speedBoost;
 
   if (!creature.targetPosition) {
+    // Lineup mode: stay put after reaching target
+    if (speedBoost > 1) {
+      return { ...creature, animationState: 'idle' as AnimationState };
+    }
     const moveChance = PERSONALITY_MOVE_CHANCE[personality];
 
     if (Math.random() < moveChance) {
