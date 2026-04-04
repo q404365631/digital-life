@@ -646,7 +646,8 @@ function findCreatureAtCanvasPosWithDist(worldX: number, worldY: number): { id: 
     }
   }
 
-  return { id: closestId, dist: closestDist };
+  // Return Infinity when nothing found so agent comparison always wins
+  return { id: closestId, dist: closestId ? closestDist : Infinity };
 }
 
 function findAgentAtCanvasPos(worldX: number, worldY: number): string | null {
@@ -667,7 +668,7 @@ function findAgentAtCanvasPosWithDist(worldX: number, worldY: number): { id: str
     }
   }
 
-  return { id: closestId, dist: closestDist };
+  return { id: closestId, dist: closestId ? closestDist : Infinity };
 }
 
 function setActionMode(mode: ActionMode): void {
