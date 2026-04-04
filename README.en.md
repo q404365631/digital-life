@@ -96,8 +96,6 @@ Summon AI agents into your world as voxel robots.
 
 - **3 agent types** — Claude, Cursor, Copilot
 - Add with the **+ Agent** button, click to switch between them
-- Select an agent and move it with **Arrow keys / WASD**, or press **Space** to sit
-- Drag to reposition directly
 
 **Humans and AI, sharing the same space.**
 We believe that's what the future of development looks like.
@@ -155,8 +153,6 @@ Your code's world is connected to your reality.
 | Move creature | Drag |
 | Feed | 🍞 → click creature |
 | Care | 🩺 → click creature → approve prescription |
-| Move agent | Select → Arrow keys / WASD |
-| Sit agent | Select → Space |
 | Zoom | Mouse wheel / pinch |
 | Pan | Right-click drag / two-finger scroll |
 | Reset zoom | Double-click |
@@ -213,7 +209,7 @@ Create a source file. Your first creature will be born.
 
 ## License
 
-MIT — [SHIKAKERU Inc.](https://shikakeru.com)
+MIT — [SHIKAKERU Inc.](https://smartkenpai.com)
 
 ---
 
@@ -222,5 +218,5 @@ MIT — [SHIKAKERU Inc.](https://shikakeru.com)
 </p>
 
 <p align="center">
-  Made by <a href="https://shikakeru.com">SHIKAKERU</a> — Fukui, Japan
+  Made by <a href="https://smartkenpai.com">SHIKAKERU</a> — Fukui, Japan
 </p>

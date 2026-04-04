@@ -96,8 +96,6 @@ VS Code 上で動く AI エージェントをボクセルロボットとして�
 
 - **3種類のエージェント** — Claude, Cursor, Copilot
 - **+ エージェント** ボタンで追加、クリックで切り替え
-- エージェントを選択して **矢印キー / WASD** で歩かせたり、**スペースキー** で座らせることができます
-- ドラッグで直接移動も可能
 
 **人間と AI が同じ空間に存在する。**
 それが、これからの開発環境のあるべき姿だと考えています。
@@ -155,8 +153,6 @@ VS Code 上で動く AI エージェントをボクセルロボットとして�
 | 生き物を移動 | ドラッグ |
 | 餌をあげる | 🍞 → 生き物をクリック |
 | お世話する | 🩺 → 生き物をクリック → 処方を承認 |
-| エージェントを移動 | 選択 → 矢印キー / WASD |
-| エージェントを座らせる | 選択 → スペースキー |
 | ズーム | マウスホイール / ピンチ |
 | パン | 右クリックドラッグ / 2本指スクロール |
 | ズームリセット | ダブルクリック |
@@ -213,7 +209,7 @@ VS Code で **F5** → 拡張機能開発ホストが起動。
 
 ## ライセンス
 
-MIT — [SHIKAKERU Inc.](https://shikakeru.com)
+MIT — [SHIKAKERU Inc.](https://smartkenpai.com)
 
 ---
 
@@ -223,5 +219,5 @@ MIT — [SHIKAKERU Inc.](https://shikakeru.com)
 </p>
 
 <p align="center">
-  Made by <a href="https://shikakeru.com">SHIKAKERU</a> — Fukui, Japan
+  Made by <a href="https://smartkenpai.com">SHIKAKERU</a> — Fukui, Japan
 </p>
