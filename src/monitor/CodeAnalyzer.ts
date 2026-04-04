@@ -1,8 +1,31 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { BUG_PATTERNS } from '../constants';
 import { FileHealth } from '../types';
 
 export class CodeAnalyzer {
+  private customPatterns: RegExp[] = [];
+
+  /** Load custom bug patterns from .digital-life.json in workspace root */
+  loadCustomPatterns(workspacePath: string): void {
+    try {
+      const configPath = path.join(workspacePath, '.digital-life.json');
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(raw);
+      if (Array.isArray(config.bugPatterns)) {
+        this.customPatterns = config.bugPatterns
+          .filter((p: unknown) => typeof p === 'object' && p !== null && 'pattern' in p)
+          .map((p: { pattern: string }) => new RegExp(p.pattern, 'g'));
+      }
+    } catch {
+      // No config file or invalid JSON — fine, use defaults only
+    }
+  }
+
+  private getAllPatterns(): RegExp[] {
+    return [...BUG_PATTERNS, ...this.customPatterns];
+  }
+
   analyzeFile(filePath: string): number {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
@@ -19,7 +42,7 @@ export class CodeAnalyzer {
       const lineCount = lines.length;
 
       let bugCount = 0;
-      for (const pattern of BUG_PATTERNS) {
+      for (const pattern of this.getAllPatterns()) {
         const regex = new RegExp(pattern.source, pattern.flags);
         const matches = content.match(regex);
         if (matches) {
@@ -30,7 +53,6 @@ export class CodeAnalyzer {
       const stat = fs.statSync(filePath);
       const lastModified = stat.mtimeMs;
 
-      // Static analysis: nesting depth and longest function
       const maxNesting = this.measureMaxNesting(lines);
       const longestFunction = this.measureLongestFunction(lines);
 
@@ -46,7 +68,6 @@ export class CodeAnalyzer {
     let depth = 0;
     for (const line of lines) {
       const trimmed = line.trim();
-      // Count brace-based nesting (works for JS/TS/Go/Rust/Java/C)
       for (const ch of trimmed) {
         if (ch === '{') depth++;
         if (ch === '}') depth = Math.max(0, depth - 1);
@@ -91,7 +112,7 @@ export class CodeAnalyzer {
 
   private countBugs(content: string): number {
     let count = 0;
-    for (const pattern of BUG_PATTERNS) {
+    for (const pattern of this.getAllPatterns()) {
       const regex = new RegExp(pattern.source, pattern.flags);
       const matches = content.match(regex);
       if (matches) {

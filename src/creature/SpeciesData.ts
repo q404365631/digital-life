@@ -67,8 +67,25 @@ export const SPECIES_DATA: Record<Species, SpeciesInfo> = {
   },
 };
 
+// Custom species mapping from .digital-life.json
+let customSpeciesMap: Record<string, Species> = {};
+
+export function loadCustomSpeciesMap(map: Record<string, string>): void {
+  const validSpecies: Species[] = ['dot', 'puff', 'blob', 'chomp', 'pip', 'wisp'];
+  customSpeciesMap = {};
+  for (const [ext, species] of Object.entries(map)) {
+    if (validSpecies.includes(species as Species)) {
+      customSpeciesMap[ext.toLowerCase().replace('.', '')] = species as Species;
+    }
+  }
+}
+
 export function getSpeciesForFile(filePath: string): Species {
   const ext = filePath.split('.').pop()?.toLowerCase() ?? '';
+
+  // Custom mapping takes priority
+  if (customSpeciesMap[ext]) return customSpeciesMap[ext];
+
   switch (ext) {
     case 'ts': case 'tsx': case 'js': case 'jsx': return 'dot';
     case 'py': return 'puff';

@@ -402,6 +402,15 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
     }
 
+    case 'creatureWorsened': {
+      const worsenedCreature = creatures.find(c => c.id === message.creatureId);
+      if (worsenedCreature) {
+        renderer.triggerWorsenEffect(worsenedCreature.position.x, worsenedCreature.position.y);
+        soundEngine.playError();
+      }
+      break;
+    }
+
     case 'creatureSpeech': {
       // Feature A: Living words — event-driven speech override
       eventSpeechOverrides.set(message.creatureId, { text: message.text, timestamp: Date.now() });
@@ -853,23 +862,22 @@ function advanceGuide(to: GuidePhase): void {
 function beginFirstRunCeremony(files: { path: string; name: string; species: string }[]): void {
   if (files.length === 0) return;
 
-  // First friend: spawn immediately as egg (it will hatch via normal hatch logic)
+  // First friend: spawn immediately as egg (hatches in ~5s)
   const first = files[0];
   vscode.postMessage({ type: 'spawnFile', filePath: first.path, name: first.name });
 
-  // Show naming prompt in the edu-message area after a short delay (hatch time)
+  // After hatch (5s) + a beat: start guide flow (feed the hungry creature)
   setTimeout(() => {
-    showNamingPrompt(first.name);
-  }, 2500);
+    startGuide();
+  }, 6500);
 
-  // Remaining files: appear in small batches, staggered
-  // They were always here — quiet arrival, no fanfare
+  // Remaining files: appear in quick batches after first creature hatches
   const rest = files.slice(1);
-  const BATCH = 3;
-  const INTERVAL = 1800;
+  const BATCH = 4;
+  const INTERVAL = 1200;
 
   for (let i = 0; i < rest.length; i++) {
-    const delay = 5000 + Math.floor(i / BATCH) * INTERVAL;
+    const delay = 3000 + Math.floor(i / BATCH) * INTERVAL;
     const file = rest[i];
     setTimeout(() => {
       vscode.postMessage({ type: 'spawnFile', filePath: file.path, name: file.name });

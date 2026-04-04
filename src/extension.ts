@@ -5,7 +5,7 @@ import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
 import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone } from './world/WorldState';
-import { getSpeciesForFile } from './creature/SpeciesData';
+import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
 import { MAX_CREATURES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
@@ -41,6 +41,15 @@ export function activate(context: vscode.ExtensionContext): void {
   const storage = new CreatureStorage(context.globalState);
   const creatureManager = new CreatureManager();
   const agentManager = new AgentManager();
+
+  // Load custom config from .digital-life.json
+  try {
+    const fs = require('fs');
+    const configPath = require('path').join(workspacePath, '.digital-life.json');
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(raw);
+    if (config.speciesMap) { loadCustomSpeciesMap(config.speciesMap); }
+  } catch { /* no config file — fine */ }
 
   // Direct terminal references — the ONLY source of truth for agent→terminal mapping
   const agentTerminals: Map<string, vscode.Terminal> = new Map();
@@ -382,19 +391,22 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     onFileHealthChanged: (filePath: string, health: FileHealth) => {
       const result = creatureManager.updateFileHealth(filePath, health);
-      if (result?.improved) {
-        // File got healthier! Trigger creature-specific recovery effect
-        const healedId = creatureManager.getByFile(filePath);
-        const healedCreature = healedId ? creatureManager.getById(healedId) : undefined;
-        if (healedCreature) {
-          panelProvider.postMessage({
-            type: 'creatureHealed',
-            creatureId: healedCreature.id,
-            creatureName: healedCreature.name,
-          });
-          broadcastSpeech('heal', healedCreature.id); // Feature A: living words on heal
-        }
+      const creatureId = creatureManager.getByFile(filePath);
+      const creature = creatureId ? creatureManager.getById(creatureId) : undefined;
+
+      if (result?.improved && creature) {
+        panelProvider.postMessage({
+          type: 'creatureHealed',
+          creatureId: creature.id,
+          creatureName: creature.name,
+        });
+        broadcastSpeech('heal', creature.id);
         updateStatusBar();
+      } else if (result?.worsened && creature) {
+        panelProvider.postMessage({
+          type: 'creatureWorsened',
+          creatureId: creature.id,
+        });
       }
       sendWorldUpdate();
       saveState();

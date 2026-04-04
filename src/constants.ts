@@ -12,7 +12,7 @@ export const ANIMATION_FRAME_DURATION = 200; // ms per sprite frame
 export const CREATURE_SPEED = 0.5; // pixels per frame
 export const IDLE_DURATION_MIN = 2000;
 export const IDLE_DURATION_MAX = 5000;
-export const HATCH_DURATION = 10000; // 10 seconds to hatch
+export const HATCH_DURATION = 5000; // 5 seconds to hatch
 
 export const GIT_POLL_INTERVAL = 5000; // 5 seconds
 export const FILE_DEBOUNCE = 300; // ms

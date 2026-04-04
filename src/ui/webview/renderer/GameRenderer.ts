@@ -38,6 +38,10 @@ export class GameRenderer {
   // Healed creature IDs — SpriteRenderer uses this to override speech bubble
   private healedCreatureIds: Map<string, number> = new Map(); // id → timestamp
 
+  // Worsen effect (red flash per creature)
+  private worsenEffects: { x: number; y: number; startTime: number }[] = [];
+  private readonly WORSEN_EFFECT_DURATION = 1200;
+
   // Farewell scene (file deletion)
   private farewellName: string | null = null;
   private farewellStart: number = 0;
@@ -67,6 +71,10 @@ export class GameRenderer {
 
   triggerFeedEffect(worldX: number, worldY: number): void {
     this.feedEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
+  }
+
+  triggerWorsenEffect(worldX: number, worldY: number): void {
+    this.worsenEffects.push({ x: worldX, y: worldY, startTime: Date.now() });
   }
 
   triggerHealEffect(worldX: number, worldY: number, creatureId?: string): void {
@@ -174,6 +182,9 @@ export class GameRenderer {
 
     // Draw heal recovery effects
     this.renderHealEffects();
+
+    // Draw worsen effects (red flash)
+    this.renderWorsenEffects();
 
     // Draw interaction hearts between nearby creatures
     this.renderInteractionHearts(creatures);
@@ -454,6 +465,61 @@ export class GameRenderer {
         this.ctx.fillStyle = gradient;
         this.ctx.beginPath();
         this.ctx.arc(effect.x, effect.y, 24, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      this.ctx.restore();
+    }
+  }
+
+  private renderWorsenEffects(): void {
+    const now = Date.now();
+    this.worsenEffects = this.worsenEffects.filter(e => now - e.startTime < this.WORSEN_EFFECT_DURATION);
+
+    for (const effect of this.worsenEffects) {
+      const elapsed = now - effect.startTime;
+      const progress = elapsed / this.WORSEN_EFFECT_DURATION;
+
+      this.ctx.save();
+
+      // Phase 1: Red flash ring (0-0.3)
+      if (progress < 0.3) {
+        const p = progress / 0.3;
+        const radius = 6 + p * 16;
+        this.ctx.globalAlpha = (1 - p) * 0.8;
+        this.ctx.strokeStyle = '#EF5350';
+        this.ctx.lineWidth = 2.5 - p * 2;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+
+      // Phase 2: Red particles scatter outward (0.1-0.8)
+      if (progress > 0.1 && progress < 0.8) {
+        const sparkAlpha = progress < 0.3 ? (progress - 0.1) / 0.2 : (0.8 - progress) / 0.5;
+        this.ctx.globalAlpha = sparkAlpha * 0.7;
+        this.ctx.fillStyle = '#EF9A9A';
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2 + elapsed * 0.004;
+          const r = 8 + progress * 22;
+          const px = effect.x + Math.cos(angle) * r;
+          const py = effect.y + Math.sin(angle) * r * 0.6;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      }
+
+      // Phase 3: Dim red glow (0.3-1.0)
+      if (progress > 0.3) {
+        const glowAlpha = (1 - progress) * 0.2;
+        this.ctx.globalAlpha = glowAlpha;
+        const gradient = this.ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, 20);
+        gradient.addColorStop(0, '#FFCDD2');
+        gradient.addColorStop(1, 'transparent');
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(effect.x, effect.y, 20, 0, Math.PI * 2);
         this.ctx.fill();
       }
 

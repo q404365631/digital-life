@@ -24,6 +24,7 @@ export class MonitorManager {
     private readonly callbacks: MonitorCallbacks
   ) {
     this.codeAnalyzer = new CodeAnalyzer();
+    this.codeAnalyzer.loadCustomPatterns(workspacePath);
 
     this.fileWatcher = new FileWatcher(workspacePath, {
       onFileAdd: (path) => this.handleFileAdd(path),

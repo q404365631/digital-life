@@ -101,8 +101,14 @@ export class CreatureManager {
     }
   }
 
-  /** Update file health and return improvement info for reward calculation */
-  updateFileHealth(sourceFile: string, health: FileHealth): { improved: boolean; bugsDelta: number; linesDelta: number } | null {
+  /** Update file health and return detailed change info */
+  updateFileHealth(sourceFile: string, health: FileHealth): {
+    improved: boolean;
+    worsened: boolean;
+    bugsDelta: number;
+    linesDelta: number;
+    nestingDelta: number;
+  } | null {
     const creatureId = this.fileToCreatureId.get(sourceFile);
     if (!creatureId) { return null; }
     const creature = this.creatures.get(creatureId);
@@ -111,10 +117,14 @@ export class CreatureManager {
     const prev = creature.fileHealth;
     const bugsDelta = prev.bugCount - health.bugCount;  // positive = bugs fixed
     const linesDelta = prev.lineCount - health.lineCount; // positive = lines reduced
+    const nestingDelta = (prev.maxNesting ?? 0) - (health.maxNesting ?? 0); // positive = shallower
 
     let expReward = 0;
-    if (bugsDelta > 0) { expReward += bugsDelta * 10; }  // 10 EXP per bug fixed
-    if (linesDelta > 50) { expReward += 15; }             // 15 EXP for significant slimming
+    if (bugsDelta > 0) { expReward += bugsDelta * 10; }
+    if (linesDelta > 50) { expReward += 15; }
+    if (nestingDelta > 2) { expReward += 10; }
+
+    const worsened = bugsDelta < -1 || linesDelta < -50 || nestingDelta < -2;
 
     let updated: CreatureData = { ...creature, fileHealth: health };
     if (expReward > 0) {
@@ -124,8 +134,10 @@ export class CreatureManager {
 
     return {
       improved: expReward > 0,
+      worsened,
       bugsDelta,
       linesDelta,
+      nestingDelta,
     };
   }
 
