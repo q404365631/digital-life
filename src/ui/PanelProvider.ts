@@ -156,14 +156,14 @@ export class PanelProvider implements vscode.WebviewViewProvider {
       saveSpark:      this.toBase64(path.join(soundsDir, '決定7.mp3')),  // File save sparkle
 
       // ── Per-species click sounds (each creature has a unique voice) ──
-      // dot  (black cat)       → cat meow
-      // puff (fluffy, shy)     → soft puff
+      // puff (black cat)       → cat meow
+      // dot  (round creature)  → soft puff
       // blob (slimy, chill)    → water drop
       // pip  (curious, quick)  → light puff
       // wisp (mysterious)      → mechanical keyboard tap
       // chomp (hungry, strong) → heavy puff
-      selectDot:   this.toBase64(path.join(soundsDir, 'ネコ2.mp3')),
-      selectPuff:  this.toBase64(path.join(soundsDir, 'パフッ1.mp3')),
+      selectDot:   this.toBase64(path.join(soundsDir, 'パフッ1.mp3')),
+      selectPuff:  this.toBase64(path.join(soundsDir, 'ネコ2.mp3')),
       selectBlob:  this.toBase64(path.join(soundsDir, 'ぴちょん単発.mp3')),
       selectPip:   this.toBase64(path.join(soundsDir, 'パフッ2.mp3')),
       selectWisp:  this.toBase64(path.join(soundsDir, 'タイピング-メカニカル単1.mp3')),
