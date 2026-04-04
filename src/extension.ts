@@ -543,19 +543,17 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
-        outputChannel.appendLine(`[addAgent] rawType="${rawType}"`);
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
-          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'}`);
+
+          void vscode.window.showInformationMessage(
+            `🔄 Switch: terminal=${switchTerminal?.name ?? 'NOT FOUND'} map=[${[...agentTerminals.keys()].map(k => k.slice(-4)).join(',')}]`
+          );
 
           if (switchTerminal && !switchTerminal.exitStatus) {
-            // Direct approach: just show the terminal (no outputChannel.show to interfere)
             switchTerminal.show(false);
-            outputChannel.appendLine(`[switch] terminal.show(false) done`);
-          } else {
-            outputChannel.appendLine(`[switch] NOT FOUND. keys: [${[...agentTerminals.keys()].join(', ')}]`);
           }
           agentManager.selectAgent(switchId);
           sendWorldUpdate();
@@ -724,7 +722,10 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
-    outputChannel.appendLine(`[MSG] type="${message.type}" data=${JSON.stringify(message).slice(0, 200)}`);
+    // Show popup for addAgent messages to debug terminal switching
+    if (message.type === 'addAgent') {
+      void vscode.window.showInformationMessage(`📨 addAgent received: ${JSON.stringify(message).slice(0, 100)}`);
+    }
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
