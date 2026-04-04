@@ -714,6 +714,8 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
+    // DEBUG: log ALL messages to confirm delivery
+    void vscode.window.showInformationMessage(`MSG: ${message.type} ${JSON.stringify(message).slice(0, 80)}`);
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);

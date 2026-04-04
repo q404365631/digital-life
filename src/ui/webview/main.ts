@@ -164,7 +164,9 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
       selectedAgentId = agentHit;
       renderer.setSelectedAgentId(agentHit);
       soundEngine.playSelectAgent();
+      // Test: send BOTH messages to see which ones arrive at extension
       vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
+      vscode.postMessage({ type: 'addAgent', agentType: 'copilot' });
       draggingAgentId = agentHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
