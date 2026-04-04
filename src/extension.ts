@@ -543,14 +543,14 @@ export function activate(context: vscode.ExtensionContext): void {
     switch (message.type) {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
+        // DEBUG: Show the actual raw message so we can see what agentType is
+        void vscode.window.showInformationMessage(
+          `agentType="${rawType}" keys=[${Object.keys(message).join(',')}] full=${JSON.stringify(message).slice(0, 150)}`
+        );
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
-
-          void vscode.window.showInformationMessage(
-            `🔄 Switch: terminal=${switchTerminal?.name ?? 'NOT FOUND'} map=[${[...agentTerminals.keys()].map(k => k.slice(-4)).join(',')}]`
-          );
 
           if (switchTerminal && !switchTerminal.exitStatus) {
             switchTerminal.show(false);
