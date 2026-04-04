@@ -108,25 +108,37 @@ export class SoundEngine {
   }
 
   // ── Public API ─────────────────────────────────────────────
-  // Each method maps to a sound selected by the DQ team.
   //
-  // Event            → Sound file               → Reason
-  // ────────────────────────────────────────────────────────────
-  // Feed (ごはん)     → マウスダブルクリック       → 小気味よいパクパク感
-  // Pet / Care選択    → マウスクリック             → 軽いタッチ
-  // Hatch (孵化)      → 8bitジャンプ3             → 殻から飛び出す
-  // Commit            → 正解9                     → やったね！達成感
-  // Level Up          → 8bitジャンプ              → ジャンプ = 成長
-  // Death (別れ)      → 不正解3                   → 切なく短い
-  // Heal (回復)       → 完了6                     → 完了 = 元気に
-  // Speech (吹き出し) → 8bitかわす                → 最も軽い
-  // Suggestion (提案) → 8bitアラート1             → 注意を引く
-  // Approve (承認)    → 決定7                     → 決定音
-  // Morning (朝)      → 電源オン                  → セッション開始
-  // Error             → エラー1                   → そのまま
-  // Friendship        → 出題3                     → 柔らかい呼びかけ
-  // First Run         → 扉が開く2                 → 新しい世界への扉
-  // Cancel            → 8bitアラート3             → 軽い否定
+  // 堀井雄二チーム — サウンド設計書 v2
+  // 「ゲームの魂は音にある。触れた瞬間に世界が応える。」
+  //
+  // Event               → Sound file                  → Reason
+  // ─────────────────────────────────────────────────────────────
+  // Feed (ごはん)        → マウスダブルクリック          → パクパク感
+  // Pet / Care選択       → マウスクリック                → 軽いタッチ
+  // Hatch (孵化)         → 8bitジャンプ3                → 殻から飛び出す
+  // Commit               → 正解9                        → 達成感
+  // Level Up             → 8bitジャンプ                 → 成長のジャンプ
+  // Death (別れ)         → 不正解3                      → 切なく短い
+  // Heal (回復)          → 完了6                        → 元気に
+  // Speech (吹き出し)    → 8bitかわす                   → 最も軽い
+  // Suggestion (提案)    → 8bitアラート1                → 注意を引く
+  // Approve (承認/YES)   → 文字送りb長                  → RPG文字送り＝処方箋の音
+  // Morning (朝)         → 電源オン                     → セッション開始
+  // Error                → エラー1                      → そのまま
+  // Friendship           → 出題3                        → 柔らかい呼びかけ
+  // First Run            → 扉が開く2                    → 新しい世界への扉
+  // Cancel               → 8bitアラート3                → 軽い否定
+  // Agent Spawn          → 小型ロボットの駆動音1        → ロボット登場
+  // Save Sparkle         → 決定7                        → キラッ = 保存OK
+  //
+  // ── Per-species click sounds ──
+  // Dot  (dark, techy)   → タイピング-メカニカル単1     → キーボードの住人
+  // Puff (fluffy, shy)   → パフッ1                      → ふわふわ = バフッ
+  // Blob (slimy, chill)  → ぴちょん単発                 → スライム = 水滴
+  // Pip  (curious, quick) → パフッ2                     → 素早い軽いバフッ
+  // Wisp (mysterious)    → ネコ2                        → 神秘的な声
+  // Chomp (hungry, strong) → パフッ3                    → 力強い重めバフッ
 
   setMuted(muted: boolean): void { this.muted = muted; }
   isMuted(): boolean { return this.muted; }
@@ -140,15 +152,29 @@ export class SoundEngine {
   playHeal(): void         { this.play('heal', 0.45); }
   playSpeech(): void       { this.play('speech', 0.2); }
   playSuggestion(): void   { this.play('suggestion', 0.4); }
-  playApprove(): void      { this.play('approve', 0.4); }
+  playApprove(): void      { this.play('approve', 0.5); }
   playMorning(): void      { this.play('morning', 0.35); }
   playError(): void        { this.play('error', 0.35); }
   playFriendship(): void   { this.play('friendship', 0.25); }
   playFirstRun(): void     { this.play('firstRun', 0.45); }
   playCancel(): void       { this.play('cancel', 0.35); }
-  playAgentSpawn(): void     { this.play('agentSpawn', 0.5); }
-  playSelectCreature(): void { this.play('selectCreature', 0.35); }
+  playAgentSpawn(): void     { this.play('agentSpawn', 0.45); }
   playSelectAgent(): void    { this.play('selectAgent', 0.4); }
+  playSaveSpark(): void      { this.play('saveSpark', 0.35); }
+  playThunder(): void        { this.play('thunder', 0.3); }
+
+  /** Play species-specific click sound — each creature has its own voice */
+  playSelectCreature(species?: string): void {
+    switch (species) {
+      case 'dot':   this.play('selectDot', 0.4);   break;
+      case 'puff':  this.play('selectPuff', 0.35);  break;
+      case 'blob':  this.play('selectBlob', 0.35);  break;
+      case 'pip':   this.play('selectPip', 0.35);   break;
+      case 'wisp':  this.play('selectWisp', 0.35);  break;
+      case 'chomp': this.play('selectChomp', 0.4);  break;
+      default:      this.play('selectBlob', 0.35);  break; // fallback
+    }
+  }
 
   /** Speak text using Web Speech API (TTS). Falls back silently if unavailable. */
   speak(text: string): void {

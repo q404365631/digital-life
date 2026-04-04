@@ -273,7 +273,8 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
     } else if (!dragMoved) {
       // Tap (no drag): select creature + reveal file
       selectedCreatureId = creatureId;
-      soundEngine.playSelectCreature();
+      const tappedCreature = creatures.find(c => c.id === creatureId);
+      soundEngine.playSelectCreature(tappedCreature?.species);
       vscode.postMessage({ type: 'revealFile', creatureId });
       tapHandledByPointerUp = true; // suppress duplicate click event
     }
@@ -413,10 +414,11 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
     }
 
     case 'fileSaved': {
-      // File saved → golden sparkle on the creature
+      // File saved → golden sparkle on the creature + sound
       const savedCreature = creatures.find(c => c.id === message.creatureId);
       if (savedCreature) {
         renderer.triggerSaveEffect(savedCreature.position.x, savedCreature.position.y);
+        soundEngine.playSaveSpark();
       }
       break;
     }
@@ -560,7 +562,8 @@ canvas.addEventListener('click', (event: MouseEvent) => {
 
   if (creatureHit) {
     selectedCreatureId = creatureHit;
-    soundEngine.playSelectCreature();
+    const clickedCreature = creatures.find(c => c.id === creatureHit);
+    soundEngine.playSelectCreature(clickedCreature?.species);
     vscode.postMessage({ type: 'revealFile', creatureId: creatureHit });
     return;
   }
