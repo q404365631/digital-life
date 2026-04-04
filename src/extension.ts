@@ -542,23 +542,6 @@ export function activate(context: vscode.ExtensionContext): void {
   function handleAgentMessage(message: WebToExtMessage): boolean {
     switch (message.type) {
       case 'addAgent': {
-        const rawType = String((message as any).agentType ?? '');
-        // DEBUG: Show the actual raw message so we can see what agentType is
-        void vscode.window.showInformationMessage(
-          `agentType="${rawType}" keys=[${Object.keys(message).join(',')}] full=${JSON.stringify(message).slice(0, 150)}`
-        );
-        // Handle terminal switching: 'switch:<agentId>'
-        if (rawType.startsWith('switch:')) {
-          const switchId = rawType.slice(7);
-          const switchTerminal = agentTerminals.get(switchId);
-
-          if (switchTerminal && !switchTerminal.exitStatus) {
-            switchTerminal.show(false);
-          }
-          agentManager.selectAgent(switchId);
-          sendWorldUpdate();
-          return true;
-        }
         void (async () => {
           const pick = await vscode.window.showQuickPick([
             { label: '\u26A1 Claude Code', description: 'Anthropic Claude', value: 'claude' as AgentType },
@@ -616,7 +599,6 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'selectAgent': {
         agentManager.selectAgent(message.agentId);
         const selTerminal = agentTerminals.get(message.agentId);
-        outputChannel.appendLine(`[selectAgent] id="${message.agentId}" terminal=${selTerminal?.name ?? 'NONE'}`);
         if (selTerminal && !selTerminal.exitStatus) {
           selTerminal.show(false);
         }
@@ -722,10 +704,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
-    // Show popup for addAgent messages to debug terminal switching
-    if (message.type === 'addAgent') {
-      void vscode.window.showInformationMessage(`📨 addAgent received: ${JSON.stringify(message).slice(0, 100)}`);
-    }
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
