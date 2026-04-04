@@ -45,18 +45,19 @@ That's exactly why we need a new interface that lets you
 
 | Your Action | What Happens |
 |---|---|
-| Create a file | A creature is born |
-| Write code | Health check runs |
+| Create a source file | A creature hatches from an egg |
+| Save code | Health check runs, sparkle effect |
 | `git commit` | All creatures are nourished, golden light rains down |
 | Leave `// TODO` | Skies darken, creatures grow anxious |
-| Leave `console.log()` | Bugs appear |
-| Delete a file | The creature quietly fades away |
+| Leave `console.log()` or `: any` | Bugs increase, creature health worsens |
+| Delete a file | The creature dissolves into particles of light |
 
 ---
 
 ## 6 Species
 
 Different species are born based on file extensions.
+Each has unique colors, voice, and personality.
 
 | Species | Files | Personality |
 |---|---|---|
@@ -67,33 +68,117 @@ Different species are born based on file extensions.
 | **Chomp** | `.rs` `.c` `.cpp` `.h` | Hungry and tough |
 | **Dot** | `.ts` `.tsx` `.js` `.jsx` | Cool and intelligent |
 
+Custom species mapping is available via `.digital-life.json`.
+
+---
+
+## Caring for Creatures
+
+Click a creature to have AI diagnose its file's health
+and suggest a specific prescription.
+
+| Prescription | What It Does | Triggered When |
+|---|---|---|
+| **Feed** | Nourish the creature | Anytime |
+| **Cure** | Fix bugs | Bugs detected |
+| **Diet** | Split large files | File exceeds 400 lines |
+| **Untangle** | Reduce nesting depth | Nesting deeper than 4 levels |
+| **Split** | Break apart long functions | Function exceeds 50 lines |
+| **Wake** | Review stale files | No updates for 7+ days |
+
+Approve the prescription and an AI agent executes it in the terminal.
+
 ---
 
 ## Coexisting with AI Agents
 
-Summon AI agents (Claude, Cursor, Copilot) into your world
-as voxel robots roaming your VS Code.
+Summon AI agents into your world as voxel robots.
 
-Watch them patrol your codebase,
-or take control with your keyboard and walk alongside them.
+- **3 agent types** — Claude, Cursor, Copilot
+- Add with the **+ Agent** button, click to switch between them
+- Select an agent and move it with **Arrow keys / WASD**, or press **Space** to sit
+- Drag to reposition directly
 
 **Humans and AI, sharing the same space.**
 We believe that's what the future of development looks like.
 
 ---
 
-## Coding DNA
+## Personality (Coding DNA)
 
-Your coding habits are analyzed into 5 DNA traits
-that shape your creatures' behavior:
+Your git history is analyzed into 5 DNA traits
+that shape creature behavior and dialogue:
 
-- **Commit Frequency** — How often you commit
-- **Night Owl** — Late-night coding tendency
-- **Polyglot** — Language diversity
-- **Velocity** — Coding speed
-- **Consistency** — Regularity of your habits
+| Trait | Meaning |
+|---|---|
+| **Active** | Commit frequency and speed |
+| **Night Owl** | Late-night coding tendency |
+| **Curious** | Language diversity |
+| **Swift** | Coding velocity |
+| **Steady** | Regularity of habits |
 
 Your DNA creates an ecosystem that is uniquely yours.
+
+---
+
+## Weather & Time
+
+Real-world weather and time of day are reflected in the world.
+
+- Rain outside means rain in your world, with drifting clouds
+- Night falls, the sky darkens
+- More bugs worsen the weather
+
+Your code's world is connected to your reality.
+
+---
+
+## Toolbar
+
+| Button | Function |
+|---|---|
+| 🍞 **Feed** | Activate feed mode |
+| 🩺 **Care** | AI diagnosis → suggest prescription |
+| **+ Agent** | Add an AI agent to the world |
+| 🔄 | Switch between agents |
+| 📷 | Save a screenshot |
+| **EN** | Cycle language (6 supported) |
+| 🔊 / 🔇 | Toggle sound on/off |
+
+---
+
+## Controls
+
+| Action | How |
+|---|---|
+| Select creature | Click (also opens file in editor) |
+| Move creature | Drag |
+| Feed | 🍞 → click creature |
+| Care | 🩺 → click creature → approve prescription |
+| Move agent | Select → Arrow keys / WASD |
+| Sit agent | Select → Space |
+| Zoom | Mouse wheel / pinch |
+| Pan | Right-click drag / two-finger scroll |
+| Reset zoom | Double-click |
+
+---
+
+## Settings
+
+Available in VS Code settings (`Ctrl+,`):
+
+| Setting | Description | Default |
+|---|---|---|
+| `digitalLife.realWeather` | Reflect real-world weather | `true` |
+| `digitalLife.language` | UI language (auto follows VS Code) | `auto` |
+| `digitalLife.sound` | Enable sound effects | `true` |
+| `digitalLife.saveReaction` | Sparkle effect on file save | `true` |
+
+---
+
+## Supported Languages
+
+English · 日本語 · 繁體中文 · 简体中文 · 한국어 · Español
 
 ---
 
@@ -106,33 +191,10 @@ npm install
 npm run build
 ```
 
-Press **F5** in VS Code. The **Digital Life** panel appears at the bottom.
+Press **F5** in VS Code to launch the Extension Development Host.
+The **DIGITAL LIFE** tab appears in the bottom panel.
 
-Create a file. Your first creature will be born.
-
----
-
-## Controls
-
-| Action | How |
-|---|---|
-| Feed a creature | 🍞 Feed → click creature |
-| Care for a creature | 🩺 Care → click creature |
-| Move an agent | Select agent → WASD / Arrow keys |
-| Switch rooms | Room button |
-| Zoom | Pinch / Ctrl+Scroll |
-| Screenshot | 📷 button |
-
----
-
-## Weather & Time
-
-Real-world weather is reflected in the world.
-When it rains outside, it rains in your world. When night falls, the sky darkens.
-
-Your code's world is connected to your reality.
-
-*Uses Open-Meteo API (weather) and ipinfo.io (geolocation). No API key required. No personal data stored.*
+Create a source file. Your first creature will be born.
 
 ---
 
@@ -140,9 +202,12 @@ Your code's world is connected to your reality.
 
 - TypeScript + Webpack
 - VS Code Webview API
-- Canvas 2D Rendering
+- Canvas 2D rendering (pixel art style)
 - chokidar (file watching)
-- simple-git (commit detection)
+- simple-git (commit detection & DNA analysis)
+- Open-Meteo API (weather) · ipinfo.io (geolocation)
+
+*No API key required. No personal data stored.*
 
 ---
 
