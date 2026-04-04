@@ -64,6 +64,13 @@ export class GameRenderer {
   private fpsTimestamp = 0;
   private currentFps = 60;
 
+  // ISS fly-over animation
+  private issX = -40; // current X position on screen
+
+  // Shooting stars (NEO-driven)
+  private shootingStars: { x: number; y: number; vx: number; vy: number; life: number; born: number; length: number }[] = [];
+  private lastShootingStarSpawn = 0;
+
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.spriteRenderer = new SpriteRenderer(ctx);
     this.uiRenderer = new UIRenderer(ctx);
@@ -258,6 +265,12 @@ export class GameRenderer {
 
     // Time-of-day tint (screen-space, over the world but under UI)
     this.renderTimeOfDayTint(world.timeOfDay);
+
+    // Space effects (screen-space, over the tint)
+    if (world.iss?.visible) {
+      this.renderISS();
+    }
+    this.renderShootingStars(world.neo?.count ?? 0);
 
     // === UI layer (fixed on screen, NOT affected by zoom & pan) ===
     this.uiRenderer.renderCreatureCount(creatures.length);
@@ -562,6 +575,100 @@ export class GameRenderer {
     }
 
     this.ctx.setLineDash([]);
+    this.ctx.restore();
+  }
+
+  /** Render ISS crossing the sky — small satellite sprite moving left to right */
+  private renderISS(): void {
+    const speed = 0.4; // pixels per frame
+    this.issX += speed;
+    if (this.issX > CANVAS_WIDTH + 40) {
+      this.issX = -40; // loop back
+    }
+
+    const y = 20 + Math.sin(this.issX / 80) * 8; // gentle wave
+
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.9;
+
+    // ISS body (small satellite shape)
+    this.ctx.fillStyle = '#E0E0E0';
+    this.ctx.fillRect(this.issX - 4, y - 1, 8, 3); // body
+    // Solar panels
+    this.ctx.fillStyle = '#4FC3F7';
+    this.ctx.fillRect(this.issX - 10, y - 1, 5, 2); // left panel
+    this.ctx.fillRect(this.issX + 5, y - 1, 5, 2);  // right panel
+
+    // Glow trail
+    this.ctx.globalAlpha = 0.3;
+    this.ctx.fillStyle = '#FFFFFF';
+    for (let i = 1; i <= 3; i++) {
+      this.ctx.globalAlpha = 0.3 - i * 0.08;
+      this.ctx.fillRect(this.issX - 4 - i * 6, y, 4, 1);
+    }
+
+    this.ctx.restore();
+  }
+
+  /** Render shooting stars — frequency driven by today's near-Earth asteroid count */
+  private renderShootingStars(neoCount: number): void {
+    if (neoCount === 0) return;
+
+    const now = Date.now();
+    // Spawn rate: more asteroids = more shooting stars (1 every 3-8 seconds)
+    const spawnInterval = Math.max(3000, 10000 - neoCount * 500);
+    if (now - this.lastShootingStarSpawn > spawnInterval) {
+      this.lastShootingStarSpawn = now;
+      const startX = Math.random() * CANVAS_WIDTH;
+      this.shootingStars.push({
+        x: startX,
+        y: Math.random() * 40, // start near top
+        vx: 2 + Math.random() * 3,
+        vy: 1 + Math.random() * 2,
+        life: 800 + Math.random() * 600,
+        born: now,
+        length: 15 + Math.random() * 25,
+      });
+    }
+
+    this.ctx.save();
+    // Update and render
+    this.shootingStars = this.shootingStars.filter(s => {
+      const age = now - s.born;
+      if (age > s.life) return false;
+
+      const progress = age / s.life;
+      const alpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
+
+      s.x += s.vx;
+      s.y += s.vy;
+
+      // Draw the streak
+      this.ctx.globalAlpha = alpha * 0.8;
+      const gradient = this.ctx.createLinearGradient(
+        s.x, s.y, s.x - s.vx * s.length / 3, s.y - s.vy * s.length / 3
+      );
+      gradient.addColorStop(0, '#FFFFFF');
+      gradient.addColorStop(0.5, '#FFD700');
+      gradient.addColorStop(1, 'rgba(255,215,0,0)');
+
+      this.ctx.strokeStyle = gradient;
+      this.ctx.lineWidth = 1.5;
+      this.ctx.beginPath();
+      this.ctx.moveTo(s.x, s.y);
+      this.ctx.lineTo(s.x - s.vx * s.length / 3, s.y - s.vy * s.length / 3);
+      this.ctx.stroke();
+
+      // Bright head
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.beginPath();
+      this.ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      return true;
+    });
+
     this.ctx.restore();
   }
 

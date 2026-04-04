@@ -102,10 +102,24 @@ export interface GraveStone {
   readonly position: Position;
 }
 
+/** ISS overhead pass data */
+export interface ISSData {
+  readonly visible: boolean;     // true when ISS is near user's location
+  readonly lat: number;
+  readonly lon: number;
+}
+
+/** Near-Earth asteroid count for today */
+export interface NEOData {
+  readonly count: number;        // number of asteroids approaching today
+}
+
 export interface WorldData {
   readonly weather: Weather;
   readonly timeOfDay: TimeOfDay;
   readonly realWeather: RealWeather;
+  readonly iss: ISSData | null;
+  readonly neo: NEOData | null;
   readonly environmentObjects: readonly EnvironmentObject[];
   readonly tileMap: readonly (readonly TileType[])[]; // legacy, kept for stored state compat
   readonly graveStones: readonly GraveStone[];

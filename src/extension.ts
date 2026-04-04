@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
 import * as https from 'https';
 import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
-import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather, getTimeOfDay } from './world/WorldState';
+import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather, updateISS, updateNEO, getTimeOfDay } from './world/WorldState';
 import { RealWeather } from './types';
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
@@ -657,10 +658,12 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         setTimeout(() => updateFriendships(), 3000);
         startTimeOfDayTimer();
-        // Fetch real weather (if enabled in settings)
+        // Fetch real weather, ISS, and NEO data
         { const cfg = vscode.workspace.getConfiguration('digitalLife');
           if (cfg.get<boolean>('realWeather', true)) { void fetchRealWeather(); }
         }
+        void fetchISSLocation();
+        void fetchNEOData();
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
@@ -758,6 +761,22 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   }
 
+  /** HTTP GET with JSON parsing (for APIs that don't support HTTPS) */
+  function httpGetJson(url: string): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const req = http.get(url, (res) => {
+        let body = '';
+        res.on('data', (chunk: string) => { body += chunk; });
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch { reject(new Error(`Invalid JSON from ${url}`)); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+    });
+  }
+
   /** Get fallback coordinates from VS Code locale */
   function getFallbackCoords(): { lat: string; lon: string } {
     const lang = vscode.env.language;
@@ -811,6 +830,82 @@ export function activate(context: vscode.ExtensionContext): void {
       outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code}, lat=${lat}, lon=${lon})`);
     } catch (err) {
       outputChannel.appendLine(`[Digital Life] Weather fetch failed: ${err}`);
+    }
+  }
+
+  // ── ISS Location (free, no API key) ──
+  let lastISSFetch = 0;
+  const ISS_FETCH_INTERVAL = 60 * 1000; // check every 60 seconds
+  let userLat = 0;
+  let userLon = 0;
+
+  async function fetchISSLocation(): Promise<void> {
+    const now = Date.now();
+    if (now - lastISSFetch < ISS_FETCH_INTERVAL) return;
+    lastISSFetch = now;
+
+    try {
+      // Get user location if not cached
+      if (userLat === 0 && userLon === 0) {
+        try {
+          const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
+          if (geo.loc) {
+            [userLat, userLon] = geo.loc.split(',').map(Number);
+          } else {
+            const fb = getFallbackCoords();
+            userLat = Number(fb.lat); userLon = Number(fb.lon);
+          }
+        } catch {
+          const fb = getFallbackCoords();
+          userLat = Number(fb.lat); userLon = Number(fb.lon);
+        }
+      }
+
+      const data = await httpGetJson('http://api.open-notify.org/iss-now.json') as {
+        iss_position?: { latitude: string; longitude: string };
+      };
+
+      if (data.iss_position) {
+        const issLat = Number(data.iss_position.latitude);
+        const issLon = Number(data.iss_position.longitude);
+
+        // Check if ISS is within ~20 degrees of user (roughly overhead region)
+        const dLat = Math.abs(issLat - userLat);
+        const dLon = Math.abs(issLon - userLon);
+        const visible = dLat < 20 && dLon < 20;
+
+        worldState = updateISS(worldState, { visible, lat: issLat, lon: issLon });
+        if (visible) {
+          outputChannel.appendLine(`[Digital Life] ISS overhead! lat=${issLat}, lon=${issLon}`);
+        }
+        sendWorldUpdate();
+      }
+    } catch (err) {
+      outputChannel.appendLine(`[Digital Life] ISS fetch failed: ${err}`);
+    }
+  }
+
+  // ── NASA Near-Earth Objects (free, DEMO_KEY) ──
+  let lastNEOFetch = 0;
+  const NEO_FETCH_INTERVAL = 60 * 60 * 1000; // check every hour
+
+  async function fetchNEOData(): Promise<void> {
+    const now = Date.now();
+    if (now - lastNEOFetch < NEO_FETCH_INTERVAL) return;
+    lastNEOFetch = now;
+
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const data = await httpsGetJson(
+        `https://api.nasa.gov/neo/rest/v1/feed?start_date=${today}&end_date=${today}&api_key=DEMO_KEY`
+      ) as { element_count?: number };
+
+      const count = data.element_count ?? 0;
+      worldState = updateNEO(worldState, { count });
+      sendWorldUpdate();
+      outputChannel.appendLine(`[Digital Life] NEO: ${count} near-Earth asteroids today`);
+    } catch (err) {
+      outputChannel.appendLine(`[Digital Life] NEO fetch failed: ${err}`);
     }
   }
 
@@ -879,6 +974,8 @@ export function activate(context: vscode.ExtensionContext): void {
       if (vscode.workspace.getConfiguration('digitalLife').get<boolean>('realWeather', true)) {
         void fetchRealWeather();
       }
+      void fetchISSLocation();
+      void fetchNEOData();
     }
   }
 

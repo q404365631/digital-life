@@ -1,4 +1,4 @@
-import { WorldData, Weather, TimeOfDay, RealWeather, EnvironmentObject, Position, GraveStone, Species } from '../types';
+import { WorldData, Weather, TimeOfDay, RealWeather, ISSData, NEOData, EnvironmentObject, Position, GraveStone, Species } from '../types';
 import { MAP_COLS, MAP_ROWS, TILE_SIZE } from '../constants';
 
 function generateId(): string {
@@ -75,6 +75,8 @@ export function createInitialWorldState(): WorldData {
     weather: 'sunny',
     timeOfDay: getTimeOfDay(),
     realWeather: null,
+    iss: null,
+    neo: null,
     environmentObjects: createEnvironmentObjects(),
     tileMap: [],
     graveStones: [],
@@ -90,6 +92,14 @@ export function updateTimeOfDay(world: WorldData): WorldData {
 export function updateRealWeather(world: WorldData, rw: RealWeather): WorldData {
   if (rw === world.realWeather) return world;
   return { ...world, realWeather: rw };
+}
+
+export function updateISS(world: WorldData, iss: ISSData | null): WorldData {
+  return { ...world, iss };
+}
+
+export function updateNEO(world: WorldData, neo: NEOData | null): WorldData {
+  return { ...world, neo };
 }
 
 export function addGraveStone(
