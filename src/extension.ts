@@ -542,19 +542,53 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'addAgent': {
         const rawType = String((message as any).agentType ?? '');
         outputChannel.appendLine(`[addAgent] rawType="${rawType}" keys=${Object.keys(message).join(',')}`);
+        outputChannel.show(true); // auto-show Output panel so user can see logs
         // Handle terminal switching: 'switch:<agentId>'
         if (rawType.startsWith('switch:')) {
           const switchId = rawType.slice(7);
           const switchTerminal = agentTerminals.get(switchId);
-          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'}`);
+          const allTerminals = vscode.window.terminals;
+          const activeTermName = vscode.window.activeTerminal?.name ?? 'none';
+          outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'} active="${activeTermName}" total=${allTerminals.length}`);
+
           if (switchTerminal && !switchTerminal.exitStatus) {
-            // Try terminal.show() first, then fallback to navigation commands
-            switchTerminal.show(false);
-            outputChannel.appendLine(`[switch] terminal.show() called for "${switchTerminal.name}"`);
+            // Multi-strategy terminal switch
+            void (async () => {
+              // Strategy 1: terminal.show()
+              switchTerminal.show(false);
+              outputChannel.appendLine(`[switch] strategy1: terminal.show(false) called`);
+
+              // Wait briefly then check if it worked
+              await new Promise(r => setTimeout(r, 200));
+
+              if (vscode.window.activeTerminal === switchTerminal) {
+                outputChannel.appendLine(`[switch] strategy1 SUCCESS: activeTerminal matches`);
+                return;
+              }
+
+              // Strategy 2: Focus terminal panel, then cycle with focusNext
+              outputChannel.appendLine(`[switch] strategy1 failed, trying strategy2: focus+cycle`);
+              await vscode.commands.executeCommand('workbench.action.terminal.focus');
+              await new Promise(r => setTimeout(r, 100));
+
+              for (let i = 0; i < allTerminals.length; i++) {
+                if (vscode.window.activeTerminal === switchTerminal) {
+                  outputChannel.appendLine(`[switch] strategy2 SUCCESS at cycle ${i}`);
+                  return;
+                }
+                await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
+                await new Promise(r => setTimeout(r, 100));
+              }
+
+              // Strategy 3: Try show(true) with preserveFocus
+              outputChannel.appendLine(`[switch] strategy2 failed, trying strategy3: show(true)`);
+              switchTerminal.show(true);
+
+              outputChannel.appendLine(`[switch] all strategies attempted. activeTerminal="${vscode.window.activeTerminal?.name ?? 'none'}"`);
+            })();
           } else {
-            outputChannel.appendLine(`[switch] terminal not found or exited`);
+            outputChannel.appendLine(`[switch] terminal not found or exited. agentTerminals keys: [${[...agentTerminals.keys()].join(', ')}]`);
           }
-          // Also select the agent in the manager
           agentManager.selectAgent(switchId);
           sendWorldUpdate();
           return true;
