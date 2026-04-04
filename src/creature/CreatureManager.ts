@@ -16,6 +16,9 @@ import {
 export class CreatureManager {
   private creatures: Map<string, CreatureData> = new Map();
   private fileToCreatureId: Map<string, string> = new Map();
+  private _lineupMode = false;
+
+  setLineupMode(active: boolean): void { this._lineupMode = active; }
 
   getAll(): readonly CreatureData[] {
     return Array.from(this.creatures.values());
@@ -202,7 +205,7 @@ export class CreatureManager {
       let updated = updateHatchProgress(creature, deltaMs);
       updated = updateCreatureNeeds(updated, deltaMinutes);
       updated = updateReactionTimer(updated, deltaMs);
-      updated = updateCreatureMovement(updated);
+      updated = updateCreatureMovement(updated, this._lineupMode ? 12 : 1);
       updated = checkCreatureInteraction(updated, snapshot);
 
       // Advance animation frame

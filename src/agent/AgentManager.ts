@@ -22,6 +22,9 @@ function randomTarget(): Position {
 export class AgentManager {
   private agents: Map<string, AgentData> = new Map();
   private nextSpriteIndex: number = 0;
+  private _lineupMode = false;
+
+  setLineupMode(active: boolean): void { this._lineupMode = active; }
 
   getAll(): readonly AgentData[] {
     return Array.from(this.agents.values());
@@ -167,8 +170,9 @@ export class AgentManager {
         } else {
           const nx = dx / dist;
           const ny = dy / dist;
-          // Running agents move faster
-          const speed = updated.status === 'running' || updated.status === 'generating' ? AGENT_SPEED * 2 : AGENT_SPEED;
+          // Running agents move faster; lineup mode = dash
+          const baseSpeed = updated.status === 'running' || updated.status === 'generating' ? AGENT_SPEED * 2 : AGENT_SPEED;
+          const speed = this._lineupMode ? baseSpeed * 30 : baseSpeed;
           updated = {
             ...updated,
             position: {

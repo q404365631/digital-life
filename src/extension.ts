@@ -641,11 +641,15 @@ export function activate(context: vscode.ExtensionContext): void {
     });
 
     lineupIsActive = true;
+    creatureManager.setLineupMode(true);
+    agentManager.setLineupMode(true);
     panelProvider.postMessage({ type: 'lineupActive', active: true });
     sendWorldUpdate();
   }
 
   function dismissLineup(): void {
+    creatureManager.setLineupMode(false);
+    agentManager.setLineupMode(false);
     creatureManager.clearAllTargets();
     agentManager.clearAllTargets();
     lineupIsActive = false;

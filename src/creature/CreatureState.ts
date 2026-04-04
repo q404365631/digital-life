@@ -239,7 +239,7 @@ function personalityTarget(personality: Personality, from: Position): Position {
   };
 }
 
-export function updateCreatureMovement(creature: CreatureData): CreatureData {
+export function updateCreatureMovement(creature: CreatureData, speedBoost = 1): CreatureData {
   if (creature.stage === 'egg') {
     return creature;
   }
@@ -256,7 +256,7 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
 
   // Personality + DNA velocity combined for final speed
   const speedMultiplier = PERSONALITY_SPEED[personality] * (0.7 + creature.dna.velocity * 0.6);
-  const speed = CREATURE_SPEED * speedMultiplier;
+  const speed = CREATURE_SPEED * speedMultiplier * speedBoost;
 
   if (!creature.targetPosition) {
     const moveChance = PERSONALITY_MOVE_CHANCE[personality];
