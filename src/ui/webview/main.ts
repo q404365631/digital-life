@@ -530,7 +530,8 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     selectedAgentId = agentHit;
     renderer.setSelectedAgentId(agentHit);
     soundEngine.playSelectAgent();
-    vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
+    // DEBUG: send addAgent to test if this code path runs at all
+    vscode.postMessage({ type: 'addAgent', agentType: 'copilot' });
     return;
   }
 
