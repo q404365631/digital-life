@@ -389,7 +389,7 @@ export class UIRenderer {
 
     // Mutation badge
     y += 22;
-    const mutation = (creature as any).mutation as MutationType;
+    const mutation = creature.mutation;
     if (mutation && MUTATION_LABELS[mutation]) {
       const m = MUTATION_LABELS[mutation];
       this.ctx.fillStyle = '#FFD700';

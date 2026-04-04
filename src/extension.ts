@@ -1,14 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as http from 'http';
-import * as https from 'https';
 import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
 import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, clearGraveStones, updateTimeOfDay, updateRealWeather, updateISS, updateNEO, getTimeOfDay } from './world/WorldState';
-import { RealWeather } from './types';
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
@@ -16,6 +13,7 @@ import { MAX_CREATURES, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD
 import { AgentManager } from './agent/AgentManager';
 import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
 import { analyzeFriendships } from './monitor/ImportAnalyzer';
+import { ApiService } from './services/ApiService';
 
 const TICK_INTERVAL = 200; // ms
 
@@ -58,6 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel('Digital Life');
   outputChannel.appendLine(`[Digital Life] Extension activated at ${new Date().toISOString()}`);
   outputChannel.show(true);
+  const apiService = new ApiService(outputChannel);
   let worldState: WorldData;
 
   // Restore state
@@ -67,8 +66,8 @@ export function activate(context: vscode.ExtensionContext): void {
     // Backfill new creature fields for saved states from older versions
     const backfilledCreatures = savedState.creatures.map(c => ({
       ...c,
-      mutation: (c as any).mutation ?? null,
-      neglectWarned: (c as any).neglectWarned ?? false,
+      mutation: 'mutation' in c ? c.mutation : null,
+      neglectWarned: 'neglectWarned' in c ? c.neglectWarned : false,
     }));
     creatureManager.loadCreatures(backfilledCreatures);
     // Backfill new WorldData fields for saved states from older versions
@@ -249,8 +248,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   /** Periodically broadcast time-of-day speech (every 30 minutes) */
   let lastTimeSlot = '';
+  let timeOfDayTimer: ReturnType<typeof setInterval> | null = null;
   function startTimeOfDayTimer(): void {
-    setInterval(() => {
+    timeOfDayTimer = setInterval(() => {
       const event = getTimeOfDaySpeechEvent();
       if (event !== lastTimeSlot) {
         lastTimeSlot = event;
@@ -805,149 +805,31 @@ export function activate(context: vscode.ExtensionContext): void {
   let lastWeatherFetch = 0;
   const WEATHER_FETCH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
-  /** HTTPS GET with redirect support (Node.js — no fetch API) */
-  function httpsGetJson(url: string, maxRedirects = 3): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      const req = https.get(url, (res) => {
-        // Follow redirects (301, 302, 307, 308)
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          if (maxRedirects <= 0) { reject(new Error('Too many redirects')); return; }
-          httpsGetJson(res.headers.location, maxRedirects - 1).then(resolve, reject);
-          return;
-        }
-        let body = '';
-        res.on('data', (chunk: string) => { body += chunk; });
-        res.on('end', () => {
-          try { resolve(JSON.parse(body)); }
-          catch { reject(new Error(`Invalid JSON from ${url}`)); }
-        });
-      });
-      req.on('error', reject);
-      req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
-    });
-  }
-
-  /** HTTP GET with JSON parsing (for APIs that don't support HTTPS) */
-  function httpGetJson(url: string): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      const req = http.get(url, (res) => {
-        let body = '';
-        res.on('data', (chunk: string) => { body += chunk; });
-        res.on('end', () => {
-          try { resolve(JSON.parse(body)); }
-          catch { reject(new Error(`Invalid JSON from ${url}`)); }
-        });
-      });
-      req.on('error', reject);
-      req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
-    });
-  }
-
-  /** Get fallback coordinates from VS Code locale */
-  function getFallbackCoords(): { lat: string; lon: string } {
-    const lang = vscode.env.language;
-    if (lang.startsWith('ja')) return { lat: '35.68', lon: '139.69' }; // Tokyo
-    if (lang.startsWith('ko')) return { lat: '37.57', lon: '126.98' }; // Seoul
-    if (lang.startsWith('zh')) return { lat: '31.23', lon: '121.47' }; // Shanghai
-    return { lat: '37.77', lon: '-122.42' }; // San Francisco (default)
-  }
-
   async function fetchRealWeather(): Promise<void> {
     const now = Date.now();
     if (now - lastWeatherFetch < WEATHER_FETCH_INTERVAL) return;
     lastWeatherFetch = now;
 
-    try {
-      // Try to get location from ipinfo.io, fall back to locale-based coords
-      let lat: string;
-      let lon: string;
-      try {
-        const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
-        if (geo.loc) {
-          [lat, lon] = geo.loc.split(',');
-        } else {
-          const fb = getFallbackCoords();
-          lat = fb.lat; lon = fb.lon;
-        }
-      } catch (geoErr) {
-        outputChannel.appendLine(`[Digital Life] Geo lookup failed: ${geoErr}, using fallback`);
-        const fb = getFallbackCoords();
-        lat = fb.lat; lon = fb.lon;
-      }
-
-      // Fetch current weather from Open-Meteo
-      const data = await httpsGetJson(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
-      ) as { current_weather?: { weathercode: number } };
-      const code = data.current_weather?.weathercode ?? -1;
-
-      // WMO weather codes → our simplified weather types
-      let rw: RealWeather;
-      if (code <= 1) rw = 'clear';
-      else if (code <= 3) rw = 'cloudy';
-      else if (code <= 49) rw = 'fog';
-      else if (code <= 69) rw = 'rain';
-      else if (code <= 79) rw = 'snow';
-      else if (code <= 99) rw = 'rain'; // thunderstorm → rain
-      else rw = null;
-
+    const rw = await apiService.fetchRealWeather();
+    if (rw !== null) {
       worldState = updateRealWeather(worldState, rw);
       sendWorldUpdate();
-      outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code}, lat=${lat}, lon=${lon})`);
-    } catch (err) {
-      outputChannel.appendLine(`[Digital Life] Weather fetch failed: ${err}`);
     }
   }
 
   // ── ISS Location (free, no API key) ──
   let lastISSFetch = 0;
   const ISS_FETCH_INTERVAL = 60 * 1000; // check every 60 seconds
-  let userLat = 0;
-  let userLon = 0;
 
   async function fetchISSLocation(): Promise<void> {
     const now = Date.now();
     if (now - lastISSFetch < ISS_FETCH_INTERVAL) return;
     lastISSFetch = now;
 
-    try {
-      // Get user location if not cached
-      if (userLat === 0 && userLon === 0) {
-        try {
-          const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
-          if (geo.loc) {
-            [userLat, userLon] = geo.loc.split(',').map(Number);
-          } else {
-            const fb = getFallbackCoords();
-            userLat = Number(fb.lat); userLon = Number(fb.lon);
-          }
-        } catch {
-          const fb = getFallbackCoords();
-          userLat = Number(fb.lat); userLon = Number(fb.lon);
-        }
-      }
-
-      const data = await httpGetJson('http://api.open-notify.org/iss-now.json') as {
-        iss_position?: { latitude: string; longitude: string };
-      };
-
-      if (data.iss_position) {
-        const issLat = Number(data.iss_position.latitude);
-        const issLon = Number(data.iss_position.longitude);
-
-        // Check if ISS is within ~20 degrees of user (roughly overhead region)
-        const dLat = Math.abs(issLat - userLat);
-        const dLon = Math.abs(issLon - userLon);
-        const visible = dLat < 20 && dLon < 20;
-
-        worldState = updateISS(worldState, { visible, lat: issLat, lon: issLon });
-        if (visible) {
-          outputChannel.appendLine(`[Digital Life] ISS overhead! lat=${issLat}, lon=${issLon}`);
-        }
-        sendWorldUpdate();
-      }
-    } catch (err) {
-      outputChannel.appendLine(`[Digital Life] ISS fetch failed: ${err}`);
+    const issData = await apiService.fetchISSLocation();
+    if (issData) {
+      worldState = updateISS(worldState, issData);
+      sendWorldUpdate();
     }
   }
 
@@ -960,68 +842,14 @@ export function activate(context: vscode.ExtensionContext): void {
     if (now - lastNEOFetch < NEO_FETCH_INTERVAL) return;
     lastNEOFetch = now;
 
-    try {
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      const data = await httpsGetJson(
-        `https://api.nasa.gov/neo/rest/v1/feed?start_date=${today}&end_date=${today}&api_key=DEMO_KEY`
-      ) as { element_count?: number };
-
-      const count = data.element_count ?? 0;
-      worldState = updateNEO(worldState, { count });
+    const neoData = await apiService.fetchNEOData();
+    if (neoData) {
+      worldState = updateNEO(worldState, neoData);
       sendWorldUpdate();
-      outputChannel.appendLine(`[Digital Life] NEO: ${count} near-Earth asteroids today`);
-    } catch (err) {
-      outputChannel.appendLine(`[Digital Life] NEO fetch failed: ${err}`);
     }
   }
 
   // ── Cat Facts for Dot creatures (catfact.ninja — free, no API key) ──
-  const CAT_FACTS_FALLBACK = [
-    '🐱 Cats sleep 12-16 hours a day',
-    '🐱 A group of cats is called a clowder',
-    '🐱 Cats have over 20 vocalizations',
-    '🐱 A cat\'s purr vibrates at 25-150 Hz',
-    '🐱 Cats can rotate their ears 180°',
-    '🐱 Cats spend 30-50% of their day grooming',
-    '🐱 A cat can jump up to 6x its length',
-    '🐱 Cats have 230 bones (humans have 206)',
-    '🐱 The oldest known cat lived to 38 years',
-    '🐱 Cats can\'t taste sweetness',
-    '🐱 A cat\'s nose print is unique like a fingerprint',
-    '🐱 Cats have 3 eyelids',
-    '🐱 A cat\'s brain is 90% similar to a human\'s',
-    '🐱 Cats can hear ultrasonic sounds',
-    '🐱 Nikola Tesla was inspired to study electricity by his cat',
-    '🐱 The first cat in space was French, named Félicette',
-    '🐱 Cats can dream just like humans',
-    '🐱 A cat\'s whiskers are as wide as its body',
-    '🐱 Ancient Egyptians shaved their eyebrows when their cat died',
-    '🐱 Cats can run up to 48 km/h',
-  ];
-  // Japanese cat facts for ja locale
-  const CAT_FACTS_JA = [
-    '🐱 猫は1日12〜16時間寝る',
-    '🐱 猫の集団は「クラウダー」と呼ばれる',
-    '🐱 猫は20種類以上の鳴き声を使い分ける',
-    '🐱 猫のゴロゴロは25〜150Hzで振動する',
-    '🐱 猫は耳を180°回転できる',
-    '🐱 猫は1日の30〜50%を毛づくろいに使う',
-    '🐱 猫は体長の6倍ジャンプできる',
-    '🐱 猫の骨は230本（人間は206本）',
-    '🐱 最長寿の猫は38歳まで生きた',
-    '🐱 猫は甘味を感じられない',
-    '🐱 猫の鼻紋は指紋のように一匹一匹違う',
-    '🐱 猫にはまぶたが3つある',
-    '🐱 猫の脳は人間の脳と90%類似している',
-    '🐱 猫は超音波を聞き取れる',
-    '🐱 テスラは飼い猫に触発されて電気の研究を始めた',
-    '🐱 宇宙に行った最初の猫はフランスのフェリセット',
-    '🐱 猫も人間と同じように夢を見る',
-    '🐱 猫のヒゲの幅は体の幅とほぼ同じ',
-    '🐱 古代エジプトでは猫が死ぬと飼い主は眉を剃った',
-    '🐱 猫は時速48kmで走れる',
-  ];
-  let catFactCache: string[] = [];
   let lastCatFactTime = 0;
   const CAT_FACT_INTERVAL = 5 * 60 * 1000; // every 5 minutes
 
@@ -1035,37 +863,11 @@ export function activate(context: vscode.ExtensionContext): void {
     lastCatFactTime = now;
 
     const speaker = dots[Math.floor(Math.random() * dots.length)];
-    let fact: string;
-
-    // Try to fetch from API, fall back to local facts
-    try {
-      if (catFactCache.length === 0) {
-        const data = await httpsGetJson('https://catfact.ninja/facts?limit=10') as {
-          data?: { fact: string }[];
-        };
-        if (data.data && data.data.length > 0) {
-          catFactCache = data.data.map(d => `🐱 ${d.fact}`);
-        }
-      }
-    } catch {
-      // API failed, use fallback
+    const fact = await apiService.fetchCatFact(speechLang);
+    if (fact) {
+      panelProvider.postMessage({ type: 'creatureSpeech', creatureId: speaker.id, text: fact });
+      outputChannel.appendLine(`[Digital Life] Cat fact: ${fact}`);
     }
-
-    if (catFactCache.length > 0) {
-      fact = catFactCache.pop()!;
-    } else {
-      // Use locale-appropriate fallback
-      const facts = speechLang === 'ja' ? CAT_FACTS_JA : CAT_FACTS_FALLBACK;
-      fact = facts[Math.floor(Math.random() * facts.length)];
-    }
-
-    // Truncate long facts for speech bubble
-    if (fact.length > 60) {
-      fact = fact.slice(0, 57) + '...';
-    }
-
-    panelProvider.postMessage({ type: 'creatureSpeech', creatureId: speaker.id, text: fact });
-    outputChannel.appendLine(`[Digital Life] Cat fact: ${fact}`);
   }
 
   // ── Late-night coding awareness ──
@@ -1258,6 +1060,7 @@ export function activate(context: vscode.ExtensionContext): void {
     dispose: () => {
       stopTickTimer();
       clearInterval(saveTimer);
+      if (timeOfDayTimer !== null) { clearInterval(timeOfDayTimer); }
       monitorManager.stop();
       saveState();
     },

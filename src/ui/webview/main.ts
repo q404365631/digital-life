@@ -728,7 +728,7 @@ btnScreenshot?.addEventListener('click', () => {
 
   // Creature stats
   const alive = creatures.filter(c => c.stage !== 'egg');
-  const mutated = alive.filter(c => (c as any).mutation);
+  const mutated = alive.filter(c => c.mutation);
   const maxLv = alive.reduce((max, c) => Math.max(max, c.level), 0);
   const totalDays = alive.length > 0
     ? Math.floor((Date.now() - Math.min(...alive.map(c => c.bornAt))) / 86400000)

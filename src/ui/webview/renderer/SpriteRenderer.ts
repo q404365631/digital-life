@@ -1,5 +1,5 @@
 import { CreatureData, AgentData, SpriteData, ColorPalette, GraveStone } from '../../../types';
-import { MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, LINE_COUNT_OBESE, LINE_COUNT_CRITICAL, STALE_DAYS } from '../../../constants';
+import { MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, LINE_COUNT_OBESE, LINE_COUNT_CRITICAL, STALE_DAYS, CREATURE_RENDER_SIZE, SPRITE_SHEET_COLS, SPRITE_SHEET_ROWS } from '../../../constants';
 import { t } from '../i18n';
 // Default palette for sprite cache key generation (formerly in PuffSprites.ts)
 const DEFAULT_PALETTE: ColorPalette = [
@@ -89,8 +89,8 @@ export class SpriteRenderer {
       return false;
     }
 
-    const cellW = img.naturalWidth / 4;
-    const cellH = img.naturalHeight / 5;
+    const cellW = img.naturalWidth / SPRITE_SHEET_COLS;
+    const cellH = img.naturalHeight / SPRITE_SHEET_ROWS;
     const srcX = col * cellW;
     const srcY = row * cellH;
 
@@ -113,7 +113,6 @@ export class SpriteRenderer {
     const sheetKey = `creature_${creature.species}_sheet`;
     const actionsKey = `creature_${creature.species}_actions`;
 
-    const CREATURE_RENDER_SIZE = 26;
     const renderSize = CREATURE_RENDER_SIZE;
 
     const lineCount = creature.fileHealth?.lineCount ?? 0;
@@ -467,8 +466,8 @@ export class SpriteRenderer {
     const lastMod = creature.fileHealth?.lastModified ?? Date.now();
     const daysSinceModified = (Date.now() - lastMod) / MS_PER_DAY;
 
-    // 3+ days abandoned -> ZZZ
-    if (daysSinceModified > 3) {
+    // Abandoned -> ZZZ
+    if (daysSinceModified > STALE_DAYS) {
       this.ctx.save();
       this.ctx.font = 'bold 8px sans-serif';
       this.ctx.fillStyle = '#90A4AE';

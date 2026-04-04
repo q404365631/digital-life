@@ -6,6 +6,7 @@ import {
   HUNGER_DECAY_RATE, HAPPINESS_DECAY_RATE,
   FEED_AMOUNT, PET_AMOUNT, HATCH_DURATION,
   CREATURE_SPEED, MUTATION_UNLOCK_LEVEL,
+  LEVEL_THRESHOLDS, INTERACTION_DISTANCE, SOCIAL_PROXIMITY,
 } from '../constants';
 
 function generateId(): string {
@@ -20,7 +21,7 @@ function randomPosition(): Position {
   };
 }
 
-const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
+// Use centralized LEVEL_THRESHOLDS from constants.ts
 
 export function calculateLevel(exp: number): number {
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
@@ -364,8 +365,7 @@ function getWalkDirection(dx: number, dy: number): AnimationState {
   return dy > 0 ? 'walk_down' : 'walk_up';
 }
 
-const INTERACTION_DISTANCE = 30;
-const SOCIAL_PROXIMITY = 12;
+// Use centralized INTERACTION_DISTANCE and SOCIAL_PROXIMITY from constants.ts
 
 /** Check for nearby creatures and apply social interaction (walk together + happiness bonus). */
 export function checkCreatureInteraction(

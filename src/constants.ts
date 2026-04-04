@@ -25,6 +25,18 @@ export const HAPPINESS_DECAY_RATE = 0.3; // per minute
 export const FEED_AMOUNT = 30;
 export const PET_AMOUNT = 20;
 
+// Creature rendering
+export const CREATURE_RENDER_SIZE = 26;
+export const SPRITE_SHEET_COLS = 4;
+export const SPRITE_SHEET_ROWS = 5;
+
+// Social interaction
+export const INTERACTION_DISTANCE = 30;
+export const SOCIAL_PROXIMITY = 12;
+
+// Level progression
+export const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
+
 export const EXCLUDED_PATTERNS = [
   '**/node_modules/**',
   '**/.git/**',
