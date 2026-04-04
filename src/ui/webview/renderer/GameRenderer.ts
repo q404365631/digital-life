@@ -1,4 +1,4 @@
-import { CreatureData, AgentData, WorldData } from '../../../types';
+import { CreatureData, AgentData, WorldData, TimeOfDay, RealWeather } from '../../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../constants';
 import { SpriteRenderer } from './SpriteRenderer';
 import { UIRenderer } from './UIRenderer';
@@ -110,8 +110,9 @@ export class GameRenderer {
     // Clear entire canvas (before any transform)
     this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Fill background color as fallback
-    this.ctx.fillStyle = '#F5F0E8';
+    // Time-of-day background — the world breathes with you
+    const bgColor = this.getTimeOfDayBackground(world.timeOfDay);
+    this.ctx.fillStyle = bgColor;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // === World layer (affected by zoom & pan) ===
@@ -119,8 +120,7 @@ export class GameRenderer {
     this.ctx.translate(panOffsetX, panOffsetY);
     this.ctx.scale(zoom, zoom);
 
-    // Solid background color (no background image)
-    this.ctx.fillStyle = '#F5F0E8';
+    this.ctx.fillStyle = bgColor;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Draw gravestones
@@ -192,10 +192,18 @@ export class GameRenderer {
     // Draw friendship indicators (Feature D: import-based relationships)
     this.renderFriendshipLinks(creatures, friendPairs);
 
-    // Draw weather overlay (part of the world)
+    // Draw weather overlay (bug-based)
     this.uiRenderer.renderWeatherOverlay(world.weather);
 
+    // Real weather overlay (from Open-Meteo — actual weather outside)
+    if (world.realWeather) {
+      this.renderRealWeatherOverlay(world.realWeather);
+    }
+
     this.ctx.restore();
+
+    // Time-of-day tint (screen-space, over the world but under UI)
+    this.renderTimeOfDayTint(world.timeOfDay);
 
     // === UI layer (fixed on screen, NOT affected by zoom & pan) ===
     this.uiRenderer.renderCreatureCount(creatures.length);
@@ -219,6 +227,86 @@ export class GameRenderer {
 
     // Farewell overlay (UI layer — screen dims, name floats away)
     this.renderFarewell();
+  }
+
+  /** Background color palette — shifts with the real-world clock */
+  private getTimeOfDayBackground(tod: TimeOfDay): string {
+    switch (tod) {
+      case 'dawn':      return '#F0E6D8'; // warm peach
+      case 'morning':   return '#F5F0E8'; // bright cream (original)
+      case 'afternoon': return '#F2EDE3'; // slightly warm
+      case 'dusk':      return '#E8DDD0'; // amber warmth
+      case 'night':     return '#2A2A3A'; // deep blue-grey
+      default:          return '#F5F0E8';
+    }
+  }
+
+  /** Subtle color tint over the entire scene — time-of-day atmosphere */
+  private renderTimeOfDayTint(tod: TimeOfDay): void {
+    if (tod === 'morning' || tod === 'afternoon') return; // no tint during day
+
+    this.ctx.save();
+    switch (tod) {
+      case 'dawn':
+        this.ctx.fillStyle = 'rgba(255, 180, 100, 0.06)'; // golden sunrise
+        break;
+      case 'dusk':
+        this.ctx.fillStyle = 'rgba(255, 120, 50, 0.08)'; // orange sunset
+        break;
+      case 'night':
+        this.ctx.fillStyle = 'rgba(20, 20, 60, 0.15)'; // blue moonlight
+        break;
+    }
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Night: add subtle stars
+    if (tod === 'night') {
+      this.ctx.fillStyle = '#FFFFFF';
+      const time = Date.now() / 2000;
+      for (let i = 0; i < 12; i++) {
+        const sx = (i * 41 + 13) % CANVAS_WIDTH;
+        const sy = (i * 29 + 7) % (CANVAS_HEIGHT * 0.4);
+        const twinkle = 0.2 + Math.sin(time + i * 1.7) * 0.15;
+        this.ctx.globalAlpha = twinkle;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, 0.8, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
+
+    this.ctx.restore();
+  }
+
+  /** Real weather effects from Open-Meteo — blended with the code-health weather */
+  private renderRealWeatherOverlay(rw: RealWeather): void {
+    if (!rw || rw === 'clear') return;
+    const time = Date.now();
+
+    this.ctx.save();
+
+    if (rw === 'snow') {
+      // Gentle snowflakes
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.globalAlpha = 0.6;
+      for (let i = 0; i < 20; i++) {
+        const x = (i * 27 + time * 0.02) % CANVAS_WIDTH;
+        const y = (i * 19 + time * 0.03) % CANVAS_HEIGHT;
+        const size = 1 + (i % 3) * 0.5;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, size, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    } else if (rw === 'fog') {
+      // Soft fog bands
+      this.ctx.globalAlpha = 0.08;
+      this.ctx.fillStyle = '#CCCCCC';
+      const drift = Math.sin(time / 5000) * 20;
+      this.ctx.fillRect(0, CANVAS_HEIGHT * 0.3 + drift, CANVAS_WIDTH, 40);
+      this.ctx.fillRect(0, CANVAS_HEIGHT * 0.6 - drift, CANVAS_WIDTH, 30);
+    }
+    // rain and cloudy are already handled by the bug-based weather system
+
+    this.ctx.restore();
   }
 
   private renderChatBubble(x: number, y: number, message: string): void {

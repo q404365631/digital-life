@@ -1,4 +1,4 @@
-import { WorldData, Weather, EnvironmentObject, Position, GraveStone, Species } from '../types';
+import { WorldData, Weather, TimeOfDay, RealWeather, EnvironmentObject, Position, GraveStone, Species } from '../types';
 import { MAP_COLS, MAP_ROWS, TILE_SIZE } from '../constants';
 
 function generateId(): string {
@@ -61,13 +61,35 @@ function createEnvironmentObjects(): EnvironmentObject[] {
   return objects;
 }
 
+export function getTimeOfDay(): TimeOfDay {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 7) return 'dawn';
+  if (hour >= 7 && hour < 16) return 'morning';
+  if (hour >= 16 && hour < 18) return 'afternoon';
+  if (hour >= 18 && hour < 20) return 'dusk';
+  return 'night';
+}
+
 export function createInitialWorldState(): WorldData {
   return {
     weather: 'sunny',
+    timeOfDay: getTimeOfDay(),
+    realWeather: null,
     environmentObjects: createEnvironmentObjects(),
     tileMap: [],
     graveStones: [],
   };
+}
+
+export function updateTimeOfDay(world: WorldData): WorldData {
+  const tod = getTimeOfDay();
+  if (tod === world.timeOfDay) return world;
+  return { ...world, timeOfDay: tod };
+}
+
+export function updateRealWeather(world: WorldData, rw: RealWeather): WorldData {
+  if (rw === world.realWeather) return world;
+  return { ...world, realWeather: rw };
 }
 
 export function addGraveStone(

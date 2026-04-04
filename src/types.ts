@@ -71,6 +71,8 @@ export interface CreatureData {
 // --- World ---
 
 export type Weather = 'sunny' | 'cloudy' | 'rainy';
+export type TimeOfDay = 'dawn' | 'morning' | 'afternoon' | 'dusk' | 'night';
+export type RealWeather = 'clear' | 'cloudy' | 'rain' | 'snow' | 'fog' | null;
 
 export type TileType =
   | 'grass_light'
@@ -102,6 +104,8 @@ export interface GraveStone {
 
 export interface WorldData {
   readonly weather: Weather;
+  readonly timeOfDay: TimeOfDay;
+  readonly realWeather: RealWeather;
   readonly environmentObjects: readonly EnvironmentObject[];
   readonly tileMap: readonly (readonly TileType[])[]; // legacy, kept for stored state compat
   readonly graveStones: readonly GraveStone[];
@@ -131,7 +135,6 @@ export type ExtToWebMessage =
   | { readonly type: 'creatureSpeech'; readonly creatureId: string; readonly text: string }
   | { readonly type: 'creatureSuggestion'; readonly creatureId: string; readonly creatureName: string; readonly action: string; readonly description: string }
   | { readonly type: 'friendships'; readonly pairs: readonly { a: string; b: string }[] }
-  | { readonly type: 'diary'; readonly creatureId: string; readonly entry: string }
   | { readonly type: 'nudgeCreature'; readonly creatureId: string }
   | { readonly type: 'firstRun'; readonly files: readonly { path: string; name: string; species: string }[] }
   | { readonly type: 'levelUp'; readonly creatureId: string }

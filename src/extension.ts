@@ -5,7 +5,8 @@ import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
-import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone } from './world/WorldState';
+import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather } from './world/WorldState';
+import { RealWeather } from './types';
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
@@ -671,12 +672,78 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // ── Real weather from Open-Meteo (free, no API key) ──
+  let lastWeatherFetch = 0;
+  const WEATHER_FETCH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+
+  async function fetchRealWeather(): Promise<void> {
+    const now = Date.now();
+    if (now - lastWeatherFetch < WEATHER_FETCH_INTERVAL) return;
+    lastWeatherFetch = now;
+
+    try {
+      // Use ipinfo.io to get approximate location (city-level, no GPS needed)
+      const geoRes = await fetch('https://ipinfo.io/json');
+      const geo = await geoRes.json() as { loc?: string };
+      if (!geo.loc) return;
+      const [lat, lon] = geo.loc.split(',');
+
+      // Fetch current weather from Open-Meteo
+      const weatherRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+      );
+      const data = await weatherRes.json() as { current_weather?: { weathercode: number } };
+      const code = data.current_weather?.weathercode ?? -1;
+
+      // WMO weather codes → our simplified weather types
+      let rw: RealWeather;
+      if (code <= 1) rw = 'clear';
+      else if (code <= 3) rw = 'cloudy';
+      else if (code <= 49) rw = 'fog';
+      else if (code <= 69) rw = 'rain';
+      else if (code <= 79) rw = 'snow';
+      else if (code <= 99) rw = 'rain'; // thunderstorm → rain
+      else rw = null;
+
+      worldState = updateRealWeather(worldState, rw);
+      outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code})`);
+    } catch {
+      // Network error — silently continue with null weather
+    }
+  }
+
+  // ── Late-night coding awareness ──
+  let lateNightWarned = false;
+
+  function checkLateNight(): void {
+    const hour = new Date().getHours();
+    const isLateNight = hour >= 23 || hour < 5;
+
+    if (isLateNight && !lateNightWarned) {
+      lateNightWarned = true;
+      // Creatures get sleepy — broadcast sleep speech
+      broadcastSpeech('lateNight');
+      // Set all non-egg creatures to sleep animation via a gentle nudge
+      const all = creatureManager.getAll().filter(c => c.stage !== 'egg');
+      if (all.length > 0) {
+        const sleepiest = all[Math.floor(Math.random() * all.length)];
+        panelProvider.postMessage({ type: 'nudgeCreature', creatureId: sleepiest.id });
+      }
+    } else if (!isLateNight) {
+      lateNightWarned = false;
+    }
+  }
+
   // Slow-tick counter for periodic checks (friendship, proactive care)
   let slowTickCounter = 0;
 
   function tickAll(): void {
     creatureManager.tick(TICK_INTERVAL);
     agentManager.tick();
+
+    // Update time of day every tick (cheap — just compares hours)
+    worldState = updateTimeOfDay(worldState);
+
     sendWorldUpdate();
     throttledStatusBarUpdate();
 
@@ -686,6 +753,8 @@ export function activate(context: vscode.ExtensionContext): void {
       slowTickCounter = 0;
       updateFriendships();       // Feature D
       checkProactiveSuggestions(); // Feature E
+      checkLateNight();
+      void fetchRealWeather();
     }
   }
 

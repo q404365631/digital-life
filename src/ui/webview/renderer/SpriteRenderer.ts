@@ -394,6 +394,10 @@ export class SpriteRenderer {
     if ((h.longestFunction ?? 0) > FUNCTION_LENGTH_THRESHOLD) return t('bubble_bloated');
     if (stale > 10)             return t('bubble_abandoned');
     if (stale > 5)              return t('bubble_sleepy');
+    // Late-night awareness — creatures gently remind you to rest
+    const hour = new Date().getHours();
+    if (hour >= 23 || hour < 5) return t('bubble_late_night');
+
     if (creature.happiness > 80 && h.bugCount === 0 && h.lineCount < 200) return t('bubble_perfect');
     if (creature.happiness > 70 && h.bugCount === 0) return t('bubble_happy');
     return null;
