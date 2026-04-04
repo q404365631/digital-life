@@ -295,13 +295,12 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
     if (override && wasDragged) {
       vscode.postMessage({ type: 'moveAgent', agentId, position: override });
     } else if (!wasDragged) {
-      // Tap (no drag): select agent + switch terminal
+      // Tap (no drag): visual selection only — let click handler send selectAgent
+      // (postMessage doesn't work inside pointerup in VS Code webview)
       selectedAgentId = agentId;
       renderer.setSelectedAgentId(agentId);
       soundEngine.playSelectAgent();
-      tapHandledByPointerUp = true;
-      // Send directly — pointer capture already released above
-      vscode.postMessage({ type: 'selectAgent', agentId });
+      // Don't set tapHandledByPointerUp — let click handler fire and send selectAgent
     }
     return;
   }
