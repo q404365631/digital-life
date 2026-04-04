@@ -7,7 +7,7 @@ import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
-import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather, updateISS, updateNEO, getTimeOfDay } from './world/WorldState';
+import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, clearGraveStones, updateTimeOfDay, updateRealWeather, updateISS, updateNEO, getTimeOfDay } from './world/WorldState';
 import { RealWeather } from './types';
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
@@ -563,6 +563,11 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case 'clearAllCreatures':
         creatureManager.loadCreatures([]);
+        syncAndSave();
+        return true;
+      case 'clearGraveStones':
+        worldState = clearGraveStones(worldState);
+        sendWorldUpdate();
         syncAndSave();
         return true;
       default:
@@ -1236,6 +1241,15 @@ export function activate(context: vscode.ExtensionContext): void {
       // Open the file in the editor
       const uri = vscode.Uri.file(worst.sourceFile);
       await vscode.window.showTextDocument(uri, { preview: true });
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('digitalLife.clearGraves', () => {
+      worldState = clearGraveStones(worldState);
+      sendWorldUpdate();
+      syncAndSave();
+      vscode.window.showInformationMessage('Digital Life: Gravestones cleared');
     })
   );
 

@@ -102,6 +102,10 @@ export function updateNEO(world: WorldData, neo: NEOData | null): WorldData {
   return { ...world, neo };
 }
 
+export function clearGraveStones(world: WorldData): WorldData {
+  return { ...world, graveStones: [] };
+}
+
 export function addGraveStone(
   world: WorldData,
   creatureName: string,

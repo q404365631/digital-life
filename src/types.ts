@@ -183,6 +183,7 @@ export type WebToExtMessage =
   | { readonly type: 'sitAgent'; readonly agentId: string; readonly sitting: boolean }
   | { readonly type: 'deleteAgent'; readonly agentId: string }
   | { readonly type: 'clearAllCreatures' }
+  | { readonly type: 'clearGraveStones' }
   | { readonly type: 'revealFile'; readonly creatureId: string }
   | { readonly type: 'spawnFile'; readonly filePath: string; readonly name: string }
   | { readonly type: 'screenshot'; readonly imageData: string }

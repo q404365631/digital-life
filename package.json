@@ -69,6 +69,10 @@
       {
         "command": "digitalLife.adoptFiles",
         "title": "Digital Life: Adopt Existing Files"
+      },
+      {
+        "command": "digitalLife.clearGraves",
+        "title": "Digital Life: Clear Gravestones"
       }
     ],
     "configuration": {
