@@ -1,4 +1,4 @@
-import { Weather, CodingDNA, CreatureData } from '../../../types';
+import { Weather, CodingDNA, CreatureData, RealWeather, TimeOfDay } from '../../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, STALE_DAYS } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
 import { t } from '../i18n';
@@ -282,6 +282,42 @@ export class UIRenderer {
         this.ctx.stroke();
       }
     }
+    this.ctx.restore();
+  }
+
+  // ── Weather + time indicator (top center) ──
+
+  renderWeatherIndicator(realWeather: RealWeather, timeOfDay: TimeOfDay): void {
+    const weatherIcon: Record<string, string> = {
+      clear: '\u2600\uFE0F',   // ☀️
+      cloudy: '\u2601\uFE0F',  // ☁️
+      rain: '\uD83C\uDF27\uFE0F',    // 🌧️
+      snow: '\u2744\uFE0F',    // ❄️
+      fog: '\uD83C\uDF2B\uFE0F',     // 🌫️
+    };
+    const todIcon: Record<string, string> = {
+      dawn: '\uD83C\uDF05',     // 🌅
+      morning: '\u2600\uFE0F',  // ☀️
+      afternoon: '\uD83C\uDF24\uFE0F', // 🌤️
+      dusk: '\uD83C\uDF07',     // 🌇
+      night: '\uD83C\uDF19',    // 🌙
+    };
+
+    const icon = realWeather ? weatherIcon[realWeather] ?? todIcon[timeOfDay] ?? '' : todIcon[timeOfDay] ?? '';
+    const label = realWeather ?? timeOfDay;
+
+    const text = `${icon} ${label}`;
+    this.ctx.save();
+    this.ctx.font = '10px sans-serif';
+    const tw = this.ctx.measureText(text).width;
+    const pw = tw + 12;
+    const px = (CANVAS_WIDTH - pw) / 2;
+
+    this.ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    this.roundPill(px, 8, pw, 20, 10);
+    this.ctx.fillStyle = '#fff';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(text, CANVAS_WIDTH / 2, 22);
     this.ctx.restore();
   }
 

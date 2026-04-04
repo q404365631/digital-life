@@ -231,6 +231,7 @@ export class GameRenderer {
     // === UI layer (fixed on screen, NOT affected by zoom & pan) ===
     this.uiRenderer.renderCreatureCount(creatures.length);
     this.uiRenderer.renderBugCount(bugCount);
+    this.uiRenderer.renderWeatherIndicator(world.realWeather, world.timeOfDay);
 
     if (selectedCreatureId) {
       const selectedCreature = creatures.find(c => c.id === selectedCreatureId);
