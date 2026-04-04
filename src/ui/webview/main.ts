@@ -627,6 +627,7 @@ btnCare?.addEventListener('click', () => setActionMode(actionMode === 'care' ? '
 btnMute?.addEventListener('click', () => {
   const newMuted = !soundEngine.isMuted();
   soundEngine.setMuted(newMuted);
+  if (newMuted) { soundEngine.stopAmbient(); }
   if (btnMute) {
     btnMute.textContent = newMuted ? '\u{1F507}' : '\u{1F50A}';
     btnMute.title = newMuted ? t('unmute') : t('mute');
@@ -664,10 +665,87 @@ btnLang?.addEventListener('click', () => {
   vscode.setState({ ...(vscode.getState() as object ?? {}), language: newLang });
 });
 
-// Screenshot button — capture canvas and send to extension for saving/sharing
+// Screenshot button — capture canvas with status card overlay
 btnScreenshot?.addEventListener('click', () => {
-  const imageData = canvas.toDataURL('image/png');
+  // Create composite canvas: game + status card
+  const CARD_HEIGHT = 64;
+  const compositeCanvas = document.createElement('canvas');
+  compositeCanvas.width = canvas.width;
+  compositeCanvas.height = canvas.height + CARD_HEIGHT;
+  const cctx = compositeCanvas.getContext('2d')!;
+
+  // Draw game canvas
+  cctx.drawImage(canvas, 0, 0);
+
+  // Draw status card background
+  cctx.fillStyle = '#1A1A1A';
+  cctx.fillRect(0, canvas.height, canvas.width, CARD_HEIGHT);
+  cctx.fillStyle = '#333';
+  cctx.fillRect(0, canvas.height, canvas.width, 1); // separator line
+
+  // Card content
+  const cy = canvas.height + 8;
+  cctx.textBaseline = 'top';
+
+  // Title
+  cctx.fillStyle = '#FFD700';
+  cctx.font = 'bold 11px sans-serif';
+  cctx.fillText('Digital Life', 8, cy);
+
+  // Creature stats
+  const alive = creatures.filter(c => c.stage !== 'egg');
+  const mutated = alive.filter(c => (c as any).mutation);
+  const maxLv = alive.reduce((max, c) => Math.max(max, c.level), 0);
+  const totalDays = alive.length > 0
+    ? Math.floor((Date.now() - Math.min(...alive.map(c => c.bornAt))) / 86400000)
+    : 0;
+
+  cctx.fillStyle = '#AAAAAA';
+  cctx.font = '9px sans-serif';
+  const stats = [
+    `${creatures.length} creatures`,
+    `Max Lv.${maxLv}`,
+    mutated.length > 0 ? `${mutated.length} mutated` : '',
+    totalDays > 0 ? `${totalDays}d survived` : '',
+  ].filter(Boolean).join('  |  ');
+  cctx.fillText(stats, 8, cy + 16);
+
+  // Individual creature badges (up to 6)
+  const display = alive.slice(0, 6);
+  let bx = 8;
+  const by = cy + 32;
+  cctx.font = '8px sans-serif';
+  for (const c of display) {
+    // Species color dot
+    const colors: Record<string, string> = {
+      dot: '#1A1A1A', puff: '#FFB6C1', blob: '#87CEEB',
+      pip: '#FFD700', wisp: '#DDA0DD', chomp: '#90EE90',
+    };
+    cctx.fillStyle = colors[c.species] ?? '#888';
+    cctx.beginPath();
+    cctx.arc(bx + 4, by + 4, 4, 0, Math.PI * 2);
+    cctx.fill();
+    cctx.strokeStyle = '#555';
+    cctx.lineWidth = 0.5;
+    cctx.stroke();
+    // Name + level
+    cctx.fillStyle = '#CCC';
+    const label = `${c.name} Lv.${c.level}`;
+    cctx.fillText(label, bx + 10, by);
+    bx += cctx.measureText(label).width + 18;
+    if (bx > canvas.width - 40) break;
+  }
+
+  // Watermark
+  cctx.fillStyle = '#555';
+  cctx.font = '8px sans-serif';
+  cctx.textAlign = 'right';
+  cctx.fillText('shikakeru.com', canvas.width - 8, cy + 48);
+  cctx.textAlign = 'left';
+
+  const imageData = compositeCanvas.toDataURL('image/png');
   vscode.postMessage({ type: 'screenshot', imageData });
+
   // Brief flash effect as feedback
   const flash = document.createElement('div');
   flash.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0.6;pointer-events:none;z-index:999;transition:opacity 0.3s';
@@ -1073,6 +1151,9 @@ function gameLoop(timestamp: number): void {
         selectedCreatureId, draggingCreatureId,
         agents: smoothAgents, agentChats, eventSpeechOverrides, friendPairs: friendshipPairs,
       });
+
+      // Update ambient BGM based on weather/time
+      soundEngine.updateAmbient(worldData.weather, worldData.timeOfDay, worldData.realWeather);
     }
   }
 

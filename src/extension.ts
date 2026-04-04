@@ -82,6 +82,24 @@ export function activate(context: vscode.ExtensionContext): void {
     isFirstRun = true;
   }
 
+  // Daily stats tracking
+  const dailyStats = {
+    date: new Date().toDateString(),
+    commits: 0,
+    bugsFixed: 0,
+    levelUps: 0,
+  };
+
+  function resetDailyStatsIfNeeded(): void {
+    const today = new Date().toDateString();
+    if (dailyStats.date !== today) {
+      dailyStats.date = today;
+      dailyStats.commits = 0;
+      dailyStats.bugsFixed = 0;
+      dailyStats.levelUps = 0;
+    }
+  }
+
   // Status bar item — always visible feedback
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   statusBarItem.command = 'digitalLife.focusWeakest';
@@ -130,13 +148,17 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }
 
+    // Daily summary for tooltip
+    resetDailyStatsIfNeeded();
+    const dailySummary = `Today: ${dailyStats.commits} commits, ${dailyStats.bugsFixed} bugs fixed, ${dailyStats.levelUps} level ups`;
+
     if (urgentName) {
       statusBarItem.text = `\u{1F33F} ${urgentName} ${urgentMsg}`;
       const happy = active.filter(c => c.hunger >= 30 && c.fileHealth.bugCount === 0).length;
-      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 ${happy} happy, ${count - happy} need care`;
+      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 ${happy} happy, ${count - happy} need care\n${dailySummary}`;
     } else {
       statusBarItem.text = `\u{1F33F} ${count} friends \u2014 all good \u2728`;
-      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 everyone is happy!`;
+      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 everyone is happy!\n${dailySummary}`;
     }
   }
 
@@ -413,6 +435,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     },
     onCommitDetected: (_sha: string) => {
+      resetDailyStatsIfNeeded();
+      dailyStats.commits++;
       creatureManager.feedAll();
       const leveledUp = creatureManager.commitBonus();
       worldState = updateWeather(worldState, 0);
@@ -432,6 +456,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
 
       for (const id of leveledUp) {
+        dailyStats.levelUps++;
         panelProvider.postMessage({ type: 'levelUp', creatureId: id });
         broadcastSpeech('levelUp', id);
         // Check if mutation was unlocked
@@ -457,6 +482,10 @@ export function activate(context: vscode.ExtensionContext): void {
       const creature = creatureId ? creatureManager.getById(creatureId) : undefined;
 
       if (result?.improved && creature) {
+        if (result.bugsDelta > 0) {
+          resetDailyStatsIfNeeded();
+          dailyStats.bugsFixed += result.bugsDelta;
+        }
         panelProvider.postMessage({
           type: 'creatureHealed',
           creatureId: creature.id,
