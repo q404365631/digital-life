@@ -185,10 +185,18 @@ export class SpriteRenderer {
       this.ctx.translate(-creature.position.x, -creature.position.y);
     }
 
-    // Adult glow effect
+    // Level-tier glow — grows with the creature's journey
     if (isAdult) {
-      this.ctx.shadowColor = '#FFD700';
-      this.ctx.shadowBlur = 6;
+      if (creature.level >= 9) {
+        this.ctx.shadowColor = '#FFD700';
+        this.ctx.shadowBlur = 10;
+      } else if (creature.level >= 7) {
+        this.ctx.shadowColor = '#87CEEB';
+        this.ctx.shadowBlur = 8;
+      } else {
+        this.ctx.shadowColor = '#FFD700';
+        this.ctx.shadowBlur = 4;
+      }
     }
 
     const bugCount = creature.fileHealth?.bugCount ?? 0;
@@ -297,6 +305,11 @@ export class SpriteRenderer {
 
     // File health effects
     this.renderHealthEffects(creature, renderSize);
+
+    // Level-tier visual rewards — visible proof of growth
+    if (creature.stage === 'adult') {
+      this.renderLevelAura(creature, renderSize);
+    }
 
     // Speech bubble — creatures speak through feelings, not numbers
     this.renderSpeechBubble(creature, renderSize);
@@ -421,7 +434,7 @@ export class SpriteRenderer {
 
     // Abandoned detection
     const lastMod = creature.fileHealth?.lastModified ?? Date.now();
-    const daysSinceModified = (Date.now() - lastMod) / (1000 * 60 * 60 * 24);
+    const daysSinceModified = (Date.now() - lastMod) / MS_PER_DAY;
 
     // 3+ days abandoned -> ZZZ
     if (daysSinceModified > 3) {
@@ -446,6 +459,73 @@ export class SpriteRenderer {
       this.ctx.fill();
       this.ctx.restore();
     }
+  }
+
+  /**
+   * Level-tier visual rewards — the reason to keep coding.
+   *   Lv 5-6: gentle sparkle orbit
+   *   Lv 7-8: pulsing aura ring
+   *   Lv 9+:  golden crown particles + aura
+   */
+  private renderLevelAura(creature: CreatureData, renderSize: number): void {
+    const lv = creature.level;
+    if (lv < 5) return;
+
+    const cx = creature.position.x;
+    const cy = creature.position.y;
+    const time = Date.now() / 1000;
+
+    this.ctx.save();
+
+    if (lv >= 9) {
+      // Crown tier: orbiting golden stars + warm glow
+      const starCount = Math.min(lv - 6, 8);
+      this.ctx.globalAlpha = 0.7;
+      this.ctx.fillStyle = '#FFD700';
+      for (let i = 0; i < starCount; i++) {
+        const angle = (i / starCount) * Math.PI * 2 + time * 1.2;
+        const r = renderSize / 2 + 6 + Math.sin(time * 2 + i) * 2;
+        const sx = cx + Math.cos(angle) * r;
+        const sy = cy + Math.sin(angle) * r - 2;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, 1.8, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      // Warm underglow
+      this.ctx.globalAlpha = 0.12 + Math.sin(time * 1.5) * 0.05;
+      const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, renderSize / 2 + 8);
+      grad.addColorStop(0, '#FFD700');
+      grad.addColorStop(1, 'transparent');
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, renderSize / 2 + 8, 0, Math.PI * 2);
+      this.ctx.fill();
+    } else if (lv >= 7) {
+      // Aura tier: pulsing blue-white ring
+      const pulse = 0.3 + Math.sin(time * 2) * 0.15;
+      this.ctx.globalAlpha = pulse;
+      this.ctx.strokeStyle = '#87CEEB';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, renderSize / 2 + 4 + Math.sin(time * 3) * 1.5, 0, Math.PI * 2);
+      this.ctx.stroke();
+    } else {
+      // Sparkle tier: 2 orbiting dots
+      this.ctx.globalAlpha = 0.5 + Math.sin(time * 2) * 0.2;
+      this.ctx.fillStyle = '#C5CAE9';
+      for (let i = 0; i < 2; i++) {
+        const angle = (i / 2) * Math.PI * 2 + time * 0.8;
+        const r = renderSize / 2 + 5;
+        const sx = cx + Math.cos(angle) * r;
+        const sy = cy + Math.sin(angle) * r;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, 1.2, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
+
+    this.ctx.restore();
   }
 
   renderGraveStone(grave: GraveStone): void {

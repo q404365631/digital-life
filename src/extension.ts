@@ -78,24 +78,53 @@ export function activate(context: vscode.ExtensionContext): void {
   function updateStatusBar(): void {
     const all = creatureManager.getAll();
     const count = all.length;
-    const hungry = all.filter(c => c.stage !== 'egg' && c.hunger < 30).length;
-    const sick = all.filter(c => c.fileHealth.bugCount > 0).length;
 
     if (count === 0) {
-      statusBarItem.text = 'Digital Life';
+      statusBarItem.text = '\u{1F331} Digital Life';
       statusBarItem.tooltip = 'Click to adopt files as friends';
       return;
     }
 
-    // Emotional status — the most urgent feeling wins
-    if (hungry > 0) {
-      statusBarItem.text = `${count} friends -- ${hungry} hungry`;
-    } else if (sick > 0) {
-      statusBarItem.text = `${count} friends -- ${sick} not well`;
-    } else {
-      statusBarItem.text = `${count} friends -- all good`;
+    const active = all.filter(c => c.stage !== 'egg');
+
+    // Find the creature that needs the most attention
+    let urgentName = '';
+    let urgentMsg = '';
+    let urgentPriority = 0;
+
+    for (const c of active) {
+      const h = c.fileHealth;
+      if (c.hunger < 15 && urgentPriority < 5) {
+        urgentPriority = 5;
+        urgentName = c.name;
+        urgentMsg = '\u{1F4A8} starving...';
+      } else if (c.hunger < 30 && urgentPriority < 4) {
+        urgentPriority = 4;
+        urgentName = c.name;
+        urgentMsg = '\u{1F37D}\uFE0F hungry';
+      } else if (h.bugCount > 3 && urgentPriority < 3) {
+        urgentPriority = 3;
+        urgentName = c.name;
+        urgentMsg = '\u{1F912} very sick';
+      } else if (h.bugCount > 0 && urgentPriority < 2) {
+        urgentPriority = 2;
+        urgentName = c.name;
+        urgentMsg = '\u{1F915} not well';
+      } else if ((h.maxNesting ?? 0) > NESTING_THRESHOLD && urgentPriority < 1) {
+        urgentPriority = 1;
+        urgentName = c.name;
+        urgentMsg = '\u{1F635} tangled';
+      }
     }
-    statusBarItem.tooltip = `Digital Life: ${count} friends`;
+
+    if (urgentName) {
+      statusBarItem.text = `\u{1F33F} ${urgentName} ${urgentMsg}`;
+      const happy = active.filter(c => c.hunger >= 30 && c.fileHealth.bugCount === 0).length;
+      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 ${happy} happy, ${count - happy} need care`;
+    } else {
+      statusBarItem.text = `\u{1F33F} ${count} friends \u2014 all good \u2728`;
+      statusBarItem.tooltip = `Digital Life: ${count} friends \u2014 everyone is happy!`;
+    }
   }
 
   updateStatusBar();
