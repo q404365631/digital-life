@@ -88,7 +88,10 @@ export function activate(context: vscode.ExtensionContext): void {
     commits: 0,
     bugsFixed: 0,
     levelUps: 0,
+    notificationsShown: 0,
   };
+
+  const MAX_DAILY_NOTIFICATIONS = 3;
 
   function resetDailyStatsIfNeeded(): void {
     const today = new Date().toDateString();
@@ -97,6 +100,23 @@ export function activate(context: vscode.ExtensionContext): void {
       dailyStats.commits = 0;
       dailyStats.bugsFixed = 0;
       dailyStats.levelUps = 0;
+      dailyStats.notificationsShown = 0;
+    }
+  }
+
+  /** Show a VS Code notification if under the daily limit */
+  function showThrottledNotification(
+    type: 'warning' | 'error' | 'info',
+    message: string,
+    ...actions: string[]
+  ): Thenable<string | undefined> | undefined {
+    resetDailyStatsIfNeeded();
+    if (dailyStats.notificationsShown >= MAX_DAILY_NOTIFICATIONS) return undefined;
+    dailyStats.notificationsShown++;
+    switch (type) {
+      case 'warning': return vscode.window.showWarningMessage(message, ...actions);
+      case 'error': return vscode.window.showErrorMessage(message, ...actions);
+      default: return vscode.window.showInformationMessage(message, ...actions);
     }
   }
 
@@ -1099,14 +1119,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Warning notifications (2 days without feeding)
     for (const creature of critical) {
-      void vscode.window.showWarningMessage(
+      const result = showThrottledNotification(
+        'warning',
         `⚠️ ${creature.name} が危篤です！早くfeedしないと明日には...`,
         'パネルを開く'
-      ).then(choice => {
-        if (choice === 'パネルを開く') {
-          void vscode.commands.executeCommand('digitalLife.showPanel');
-        }
-      });
+      );
+      if (result) {
+        void result.then(choice => {
+          if (choice === 'パネルを開く') {
+            void vscode.commands.executeCommand('digitalLife.showPanel');
+          }
+        });
+      }
       panelProvider.postMessage({ type: 'creatureCritical', creatureId: creature.id, creatureName: creature.name });
     }
 
@@ -1127,9 +1151,7 @@ export function activate(context: vscode.ExtensionContext): void {
           creatureId: removed.id,
           creatureName: removed.name,
         });
-        void vscode.window.showErrorMessage(
-          `💀 ${removed.name} は餓死しました...墓石が残されています。`
-        );
+        showThrottledNotification('error', `💀 ${removed.name} は餓死しました...墓石が残されています。`);
         syncAndSave();
       }
     }

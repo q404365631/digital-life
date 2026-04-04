@@ -37,7 +37,7 @@ function lerpPosition(current: { x: number; y: number }, target: { x: number; y:
   };
 }
 
-// Canvas setup
+// Canvas setup with HiDPI support
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d');
 
@@ -45,8 +45,19 @@ if (!ctx) {
   throw new Error('Failed to get 2D context');
 }
 
-// Disable image smoothing for pixel art
-ctx.imageSmoothingEnabled = false;
+/** Scale canvas buffer for HiDPI displays while keeping game coords at CANVAS_WIDTH x CANVAS_HEIGHT */
+function updateCanvasSize(): void {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = CANVAS_WIDTH * dpr;
+  canvas.height = CANVAS_HEIGHT * dpr;
+  ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx!.imageSmoothingEnabled = false;
+}
+updateCanvasSize();
+
+// Re-scale on DPR changes (e.g. moving window between monitors)
+window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+  .addEventListener('change', updateCanvasSize);
 
 const renderer = new GameRenderer(ctx);
 const soundEngine = new SoundEngine();
@@ -342,7 +353,7 @@ let sessionCommitCount = 0;
 
 // ── Guide flow ───────────────────────────────────────────────
 // A gentle first-time tutorial: Feed → Care, taught through experience
-type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'done';
+type GuidePhase = 'none' | 'waitFeed' | 'waitCare' | 'tips' | 'done';
 let guidePhase: GuidePhase = 'none';
 
 // Message handling
@@ -885,9 +896,9 @@ function handleAction(mode: ActionMode, creature: CreatureData): void {
       soundEngine.playPet();
       showEduMessage(t('care_diagnosing'));
 
-      // Guide: care completed — tutorial done
+      // Guide: care completed — show feature tips
       if (guidePhase === 'waitCare') {
-        advanceGuide('done');
+        advanceGuide('tips');
       }
       break;
   }
@@ -982,13 +993,39 @@ function advanceGuide(to: GuidePhase): void {
       if (guidePhase !== 'waitCare') return;
       showEduMessage(t('guide_care'));
       btnCare?.classList.add('guide-pulse');
-      // Auto-complete guide after a few seconds (don't force the user)
+      // Auto-advance after a few seconds (don't force the user)
       setTimeout(() => {
         if (guidePhase === 'waitCare') {
-          advanceGuide('done');
+          advanceGuide('tips');
         }
       }, 6000);
     }, 3000);
+  } else if (to === 'tips') {
+    btnCare?.classList.remove('guide-pulse');
+    guidePhase = 'tips';
+    // Show feature tips in sequence
+    const tips = [
+      { msg: () => t('guide_screenshot'), delay: 0, pulse: btnScreenshot },
+      { msg: () => t('guide_starve'), delay: 5000, pulse: null },
+      { msg: () => t('guide_mutation'), delay: 10000, pulse: null },
+    ];
+    for (const tip of tips) {
+      setTimeout(() => {
+        if (guidePhase !== 'tips') return;
+        showEduMessage(tip.msg());
+        if (tip.pulse) {
+          tip.pulse.classList.add('guide-pulse');
+          setTimeout(() => tip.pulse?.classList.remove('guide-pulse'), 4000);
+        }
+      }, tip.delay);
+    }
+    // Complete after all tips shown
+    setTimeout(() => {
+      if (guidePhase === 'tips') {
+        hideEduMessage();
+        guidePhase = 'done';
+      }
+    }, 16000);
   } else if (to === 'done') {
     btnCare?.classList.remove('guide-pulse');
     hideEduMessage();

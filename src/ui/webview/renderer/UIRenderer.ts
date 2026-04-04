@@ -1,7 +1,26 @@
-import { Weather, CodingDNA, CreatureData, RealWeather, TimeOfDay } from '../../../types';
+import { Weather, CodingDNA, CreatureData, RealWeather, TimeOfDay, MutationType } from '../../../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, STALE_DAYS } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
 import { t } from '../i18n';
+
+function getPersonalityLabel(dna: CodingDNA): string {
+  const scores: [string, number][] = [
+    ['Active',  dna.commitFrequency + dna.velocity],
+    ['Calm',    dna.consistency + (1 - dna.velocity)],
+    ['Curious', dna.polyglot + dna.nightOwl],
+    ['Shy',     (1 - dna.commitFrequency) + (1 - dna.polyglot)],
+  ];
+  scores.sort((a, b) => b[1] - a[1]);
+  return scores[0][0];
+}
+
+const MUTATION_LABELS: Record<string, { label: string; icon: string }> = {
+  nightGlow:   { label: 'Night Glow',   icon: '\u{1F319}' },
+  rainbow:     { label: 'Rainbow',      icon: '\u{1F308}' },
+  speedster:   { label: 'Speedster',    icon: '\u26A1' },
+  zen:         { label: 'Zen',          icon: '\u{1F9D8}' },
+  hyperactive: { label: 'Hyperactive',  icon: '\u2728' },
+};
 
 /*
  * UIRenderer — screen-space overlays (not affected by zoom/pan).
@@ -265,6 +284,134 @@ export class UIRenderer {
         this.ctx.arc(cx, cy, r2, 0, Math.PI * 2);
         this.ctx.stroke();
       }
+    }
+
+    this.ctx.restore();
+  }
+
+  // ── Profile Card (selected creature detail view) ──
+
+  renderProfileCard(creature: CreatureData): void {
+    const W = 160, H = 120;
+    const px = (CANVAS_WIDTH - W) / 2;
+    const py = CANVAS_HEIGHT - H - 36; // above toolbar
+
+    this.ctx.save();
+
+    // Card background
+    this.ctx.fillStyle = 'rgba(10, 10, 20, 0.85)';
+    this.roundPill(px, py, W, H, 8);
+
+    // Gold border
+    this.ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.roundRect(px, py, W, H, 8);
+    this.ctx.stroke();
+
+    let y = py + 14;
+    const left = px + 8;
+    const right = px + W - 8;
+
+    // Name + Species
+    this.ctx.fillStyle = '#FFD700';
+    this.ctx.font = 'bold 11px sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(creature.name, left, y);
+
+    const speciesColors: Record<string, string> = {
+      dot: '#666', puff: '#FFB6C1', blob: '#87CEEB',
+      pip: '#FFD700', wisp: '#DDA0DD', chomp: '#90EE90',
+    };
+    this.ctx.fillStyle = speciesColors[creature.species] ?? '#888';
+    this.ctx.font = '9px sans-serif';
+    this.ctx.textAlign = 'right';
+    this.ctx.fillText(creature.species.toUpperCase(), right, y);
+
+    // Divider
+    y += 6;
+    this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    this.ctx.fillRect(left, y, W - 16, 1);
+
+    // Stats row 1: Level + Stage + Personality
+    y += 12;
+    this.ctx.textAlign = 'left';
+    this.ctx.fillStyle = '#AAAAAA';
+    this.ctx.font = '8px sans-serif';
+    const personality = getPersonalityLabel(creature.dna);
+    this.ctx.fillText(`Lv.${creature.level}  ${creature.stage}  ${personality}`, left, y);
+
+    // Stats row 2: Age
+    y += 12;
+    const ageDays = Math.floor((Date.now() - creature.bornAt) / MS_PER_DAY);
+    const ageText = ageDays === 0 ? 'Born today' : `${ageDays} day${ageDays > 1 ? 's' : ''} old`;
+    this.ctx.fillStyle = '#888';
+    this.ctx.fillText(ageText, left, y);
+
+    // EXP bar
+    const expThresholds = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500];
+    const currentThreshold = expThresholds[creature.level - 1] ?? 0;
+    const nextThreshold = expThresholds[creature.level] ?? (currentThreshold + 1000);
+    const expProgress = (creature.exp - currentThreshold) / (nextThreshold - currentThreshold);
+    this.ctx.fillText('EXP', left, y + 12);
+    const barX = left + 24, barY = y + 5, barW = W - 48, barH = 5;
+    this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    this.roundPill(barX, barY, barW, barH, 2);
+    this.ctx.fillStyle = '#4FC3F7';
+    this.roundPill(barX, barY, Math.max(barH, barW * Math.min(1, expProgress)), barH, 2);
+
+    // Mutation badge
+    y += 22;
+    const mutation = (creature as any).mutation as MutationType;
+    if (mutation && MUTATION_LABELS[mutation]) {
+      const m = MUTATION_LABELS[mutation];
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.font = 'bold 8px sans-serif';
+      this.ctx.fillText(`${m.icon} ${m.label}`, left, y);
+    } else {
+      this.ctx.fillStyle = '#555';
+      this.ctx.font = '8px sans-serif';
+      this.ctx.fillText('No mutation yet', left, y);
+    }
+
+    // Health status
+    const h = creature.fileHealth;
+    this.ctx.textAlign = 'right';
+    this.ctx.font = '8px sans-serif';
+    if (h.bugCount > 0) {
+      this.ctx.fillStyle = '#ef5350';
+      this.ctx.fillText(`${h.bugCount} bugs`, right, y);
+    } else if (h.lineCount > LINE_COUNT_HEAVY) {
+      this.ctx.fillStyle = '#ffa726';
+      this.ctx.fillText(`${h.lineCount} lines`, right, y);
+    } else {
+      this.ctx.fillStyle = '#8bc34a';
+      this.ctx.fillText('Healthy', right, y);
+    }
+
+    // DNA mini bars (bottom row)
+    y += 12;
+    this.ctx.textAlign = 'left';
+    const traits: [string, number, string][] = [
+      ['A', creature.dna.commitFrequency, '#8bc34a'],
+      ['N', creature.dna.nightOwl, '#7e57c2'],
+      ['C', creature.dna.polyglot, '#29b6f6'],
+      ['V', creature.dna.velocity, '#ffa726'],
+      ['S', creature.dna.consistency, '#ef5350'],
+    ];
+    const trayWidth = (W - 16) / traits.length;
+    for (let i = 0; i < traits.length; i++) {
+      const [label, value, color] = traits[i];
+      const tx = left + i * trayWidth;
+      this.ctx.fillStyle = '#666';
+      this.ctx.font = 'bold 7px sans-serif';
+      this.ctx.fillText(label, tx, y);
+      // Mini bar
+      const mbx = tx + 8, mbw = trayWidth - 12;
+      this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      this.ctx.fillRect(mbx, y - 5, mbw, 4);
+      this.ctx.fillStyle = color;
+      this.ctx.fillRect(mbx, y - 5, mbw * value, 4);
     }
 
     this.ctx.restore();

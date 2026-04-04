@@ -78,6 +78,9 @@ const dict: Record<Language, Dict> = {
     guide_feed:       'Looks hungry — try giving food!',
     guide_fed:        'Wonderful! They feel much better.',
     guide_care:       'When they feel sick, use Care.',
+    guide_screenshot: 'Try the camera button to take a screenshot!',
+    guide_starve:     'Don\'t forget to feed — 3 days without food is fatal...',
+    guide_mutation:   'Level up to Lv.5 to unlock a special mutation!',
 
     // personality (replaces DNA)
     personality:      'Personality',
@@ -136,6 +139,9 @@ const dict: Record<Language, Dict> = {
     bubble_evolve:    'おおきくなった！',
     bubble_late_night:'もうねるじかんだよ...？',
     farewell:         'さよなら、{name}',
+    guide_screenshot: 'カメラボタンでスクリーンショットが撮れるよ！',
+    guide_starve:     'ごはんを忘れずに — 3日間放置すると死んじゃうよ...',
+    guide_mutation:   'Lv.5になると特別な突然変異が解放される！',
     guide_feed:       'おなかすいてるみたい — ごはんあげてみて！',
     guide_fed:        'やった！げんきになったね',
     guide_care:       'ぐったりしたら「お世話」してあげてね',
