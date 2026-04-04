@@ -594,33 +594,44 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // ── Lineup (点呼) ─────────────────────────────────────────
-  let lineupTimer: ReturnType<typeof setTimeout> | null = null;
+  let lineupIsActive = false;
 
   function performLineup(): void {
-    // Cancel any active lineup timer
-    if (lineupTimer) { clearTimeout(lineupTimer); }
+    // Toggle: click again to dismiss
+    if (lineupIsActive) {
+      dismissLineup();
+      return;
+    }
 
     const allCreatures = creatureManager.getAll().filter(c => c.stage !== 'egg');
     const allAgents = agentManager.getAll();
+    const totalEntities = allCreatures.length + allAgents.length;
+    if (totalEntities === 0) return;
 
-    // Grid layout: creatures in upper rows, agents in lower row
-    const cols = Math.max(4, Math.ceil(Math.sqrt(allCreatures.length + allAgents.length)));
-    const cellW = CANVAS_WIDTH / (cols + 1);
-    const cellH = 50;
-    const startY = 50;
+    // Grid layout: generous spacing so names/file labels don't overlap
+    const cols = Math.min(6, Math.max(3, Math.ceil(Math.sqrt(allCreatures.length))));
+    const rows = Math.ceil(allCreatures.length / cols);
+    const marginX = 40;
+    const marginTop = 55;  // room for file path + name labels above sprite
+    const marginBot = 70;  // room for agents at bottom
+    const usableW = CANVAS_WIDTH - marginX * 2;
+    const usableH = CANVAS_HEIGHT - marginTop - marginBot;
+    const cellW = usableW / Math.max(cols, 1);
+    const cellH = Math.min(60, usableH / Math.max(rows, 1));
 
-    // Place creatures in grid
-    allCreatures.forEach((c, i) => {
+    // Place creatures in a grid, sorted by source file for easy scanning
+    const sorted = [...allCreatures].sort((a, b) => a.sourceFile.localeCompare(b.sourceFile));
+    sorted.forEach((c, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       creatureManager.setTargetPosition(c.id, {
-        x: cellW * (col + 1),
-        y: startY + cellH * row,
+        x: marginX + cellW * (col + 0.5),
+        y: marginTop + cellH * (row + 0.5),
       });
     });
 
     // Place agents in bottom row
-    const agentY = CANVAS_HEIGHT - 60;
+    const agentY = CANVAS_HEIGHT - 40;
     const agentCellW = CANVAS_WIDTH / (allAgents.length + 1);
     allAgents.forEach((a, i) => {
       agentManager.setTargetPosition(a.id, {
@@ -629,17 +640,17 @@ export function activate(context: vscode.ExtensionContext): void {
       });
     });
 
+    lineupIsActive = true;
     panelProvider.postMessage({ type: 'lineupActive', active: true });
     sendWorldUpdate();
+  }
 
-    // Auto-dismiss after 5 seconds
-    lineupTimer = setTimeout(() => {
-      creatureManager.clearAllTargets();
-      agentManager.clearAllTargets();
-      panelProvider.postMessage({ type: 'lineupActive', active: false });
-      sendWorldUpdate();
-      lineupTimer = null;
-    }, 5000);
+  function dismissLineup(): void {
+    creatureManager.clearAllTargets();
+    agentManager.clearAllTargets();
+    lineupIsActive = false;
+    panelProvider.postMessage({ type: 'lineupActive', active: false });
+    sendWorldUpdate();
   }
 
   function handleLifecycleMessage(message: WebToExtMessage): boolean {

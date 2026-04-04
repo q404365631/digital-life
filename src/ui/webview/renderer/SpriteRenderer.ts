@@ -251,10 +251,12 @@ export class SpriteRenderer {
         this.ctx.textAlign = 'left';
         this.ctx.fillText(lvText, cx + nameW / 2 - lvW / 2 + 3, baseY);
 
-        // File path — only for individually selected creature (not lineup)
-        if (isSelected) {
+        // File path — show for selected creature OR during lineup
+        if (isSelected || this.lineupMode) {
           const fullPath = creature.sourceFile;
-          const shortPath = fullPath.split('/').slice(-2).join('/');
+          const shortPath = this.lineupMode
+            ? fullPath.split('/').pop() ?? fullPath  // Lineup: filename only (compact)
+            : fullPath.split('/').slice(-2).join('/'); // Selected: dir/filename
           this.ctx.font = '7px sans-serif';
           this.ctx.textAlign = 'center';
           const pathW = this.ctx.measureText(shortPath).width;
@@ -264,9 +266,11 @@ export class SpriteRenderer {
           this.ctx.roundRect(cx - pathW / 2 - 4, baseY - 22, pathW + 8, 11, 3);
           this.ctx.fill();
 
-          this.ctx.fillStyle = '#90CAF9';
+          this.ctx.fillStyle = this.lineupMode ? '#B0BEC5' : '#90CAF9';
           this.ctx.fillText(shortPath, cx, baseY - 13);
+        }
 
+        if (isSelected) {
           // Selection ring
           this.ctx.strokeStyle = 'rgba(255,215,0,0.6)';
           this.ctx.lineWidth = 1.5;
@@ -280,6 +284,7 @@ export class SpriteRenderer {
           const h = creature.fileHealth;
           const dotColor = h.bugCount > 0 ? '#EF5350' :
                            h.lineCount > 400 ? '#FFA726' :
+                           (h.maxNesting ?? 0) > 8 || (h.longestFunction ?? 0) > 80 ? '#AB47BC' :
                            creature.hunger < 20 ? '#FFEE58' : '#66BB6A';
           this.ctx.fillStyle = dotColor;
           this.ctx.beginPath();
