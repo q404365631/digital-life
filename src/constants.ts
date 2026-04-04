@@ -51,4 +51,14 @@ export const BUG_PATTERNS = [
   /eslint-disable(?!-next-line)/g,
 ];
 
+export const MS_PER_DAY = 86_400_000;
+
+// Health thresholds — shared between extension and webview
+export const NESTING_THRESHOLD = 8;
+export const FUNCTION_LENGTH_THRESHOLD = 80;
+export const LINE_COUNT_HEAVY = 300;
+export const LINE_COUNT_OBESE = 400;
+export const LINE_COUNT_CRITICAL = 500;
+export const STALE_DAYS = 3;
+
 export const STORAGE_KEY = 'digitalLife.state';

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
@@ -8,7 +9,7 @@ import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone }
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
 import { WorldData, ExtToWebMessage, WebToExtMessage, AgentType, CodingDNA, FileHealth, CreatureData } from './types';
-import { MAX_CREATURES, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
+import { MAX_CREATURES, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, LINE_COUNT_OBESE, STALE_DAYS } from './constants';
 import { AgentManager } from './agent/AgentManager';
 import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
 import { analyzeFriendships } from './monitor/ImportAnalyzer';
@@ -44,12 +45,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Load custom config from .digital-life.json
   try {
-    const fs = require('fs');
-    const configPath = require('path').join(workspacePath, '.digital-life.json');
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    const config = JSON.parse(raw);
-    if (config.speciesMap) { loadCustomSpeciesMap(config.speciesMap); }
-  } catch { /* no config file — fine */ }
+    const configRaw = fs.readFileSync(path.join(workspacePath, '.digital-life.json'), 'utf-8');
+    const config = JSON.parse(configRaw) as Record<string, unknown>;
+    if (config.speciesMap) { loadCustomSpeciesMap(config.speciesMap as Record<string, string>); }
+  } catch { /* no config file or invalid JSON — use defaults */ }
 
   // Direct terminal references — the ONLY source of truth for agent→terminal mapping
   const agentTerminals: Map<string, vscode.Terminal> = new Map();
@@ -218,16 +217,16 @@ export function activate(context: vscode.ExtensionContext): void {
     const candidates = creatureManager.getAll().filter(c => {
       if (c.stage === 'egg') return false;
       const h = c.fileHealth;
-      const daysSince = (now - h.lastModified) / 864e5;
-      return h.bugCount >= 3 || h.lineCount > 400 || daysSince > 5;
+      const daysSince = (now - h.lastModified) / MS_PER_DAY;
+      return h.bugCount >= 3 || h.lineCount > LINE_COUNT_OBESE || daysSince > STALE_DAYS + 2;
     });
 
     if (candidates.length === 0) return;
 
     // Pick the worst-off creature
     const worst = candidates.sort((a, b) => {
-      const scoreA = a.fileHealth.bugCount * 10 + (a.fileHealth.lineCount > 400 ? 5 : 0);
-      const scoreB = b.fileHealth.bugCount * 10 + (b.fileHealth.lineCount > 400 ? 5 : 0);
+      const scoreA = a.fileHealth.bugCount * 10 + (a.fileHealth.lineCount > LINE_COUNT_OBESE ? 5 : 0);
+      const scoreB = b.fileHealth.bugCount * 10 + (b.fileHealth.lineCount > LINE_COUNT_OBESE ? 5 : 0);
       return scoreB - scoreA;
     })[0];
 
@@ -242,7 +241,7 @@ export function activate(context: vscode.ExtensionContext): void {
       description = speechLang === 'ja'
         ? `バグが${h.bugCount}個...お薬をあげますか？`
         : `${h.bugCount} bugs making them sick... give medicine?`;
-    } else if (h.lineCount > 400) {
+    } else if (h.lineCount > LINE_COUNT_OBESE) {
       action = 'diet';
       description = speechLang === 'ja'
         ? `${h.lineCount}行もあって重そう...ダイエットさせますか？`
@@ -286,14 +285,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     for (const c of all) {
       const h = c.fileHealth;
-      const daysSince = (Date.now() - h.lastModified) / 864e5;
+      const daysSince = (Date.now() - h.lastModified) / MS_PER_DAY;
       // Lower score = worse health
       let score = 100;
       if (h.bugCount > 0) score -= h.bugCount * 20;
-      if (h.lineCount > 300) score -= 30;
-      if ((h.maxNesting ?? 0) > 8) score -= 25;
-      if ((h.longestFunction ?? 0) > 80) score -= 20;
-      if (daysSince > 3) score -= 20;
+      if (h.lineCount > LINE_COUNT_HEAVY) score -= 30;
+      if ((h.maxNesting ?? 0) > NESTING_THRESHOLD) score -= 25;
+      if ((h.longestFunction ?? 0) > FUNCTION_LENGTH_THRESHOLD) score -= 20;
+      if (daysSince > STALE_DAYS) score -= 20;
       score -= (100 - c.hunger) * 0.3;
 
       if (score < worstScore) {
@@ -363,8 +362,7 @@ export function activate(context: vscode.ExtensionContext): void {
           creature.position,
         );
         panelProvider.postMessage({ type: 'creatureDied', creatureId: creature.id, creatureName: creature.name });
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
       }
     },
     onCommitDetected: (_sha: string) => {
@@ -377,8 +375,7 @@ export function activate(context: vscode.ExtensionContext): void {
         broadcastSpeech('levelUp', id); // Feature A: living words on level up
       }
       broadcastSpeech('commit'); // Feature A: living words on commit
-      sendWorldUpdate();
-      saveState();
+      syncAndSave();
       void dnaAnalyzer.analyze().then(dna => { currentDNA = dna; });
     },
     onBugCountChanged: (count: number) => {
@@ -386,8 +383,7 @@ export function activate(context: vscode.ExtensionContext): void {
       worldState = updateWeather(worldState, count);
       creatureManager.updateBugEffect(count > 0);
       panelProvider.postMessage({ type: 'bugCountChanged', count });
-      sendWorldUpdate();
-      saveState();
+      syncAndSave();
     },
     onFileHealthChanged: (filePath: string, health: FileHealth) => {
       const result = creatureManager.updateFileHealth(filePath, health);
@@ -408,8 +404,7 @@ export function activate(context: vscode.ExtensionContext): void {
           creatureId: creature.id,
         });
       }
-      sendWorldUpdate();
-      saveState();
+      syncAndSave();
     },
   });
 
@@ -427,30 +422,29 @@ export function activate(context: vscode.ExtensionContext): void {
         } else if (message.action === 'pet') {
           creatureManager.pet(message.targetId);
         }
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       case 'care': {
         const careCreature = creatureManager.getById(message.targetId);
         if (careCreature) {
           const health = careCreature.fileHealth;
-          const daysSince = (Date.now() - health.lastModified) / (1000 * 60 * 60 * 24);
+          const daysSince = (Date.now() - health.lastModified) / MS_PER_DAY;
 
           let action: string;
           let description: string;
           if (health.bugCount > 0) {
             action = 'cure';
             description = `${health.bugCount}件のバグを修正します (TODO, console.log, any型)`;
-          } else if (health.lineCount > 300) {
+          } else if (health.lineCount > LINE_COUNT_HEAVY) {
             action = 'diet';
             description = `${health.lineCount}行 → 200行以下にリファクタリングします`;
-          } else if ((health.maxNesting ?? 0) > 8) {
+          } else if ((health.maxNesting ?? 0) > NESTING_THRESHOLD) {
             action = 'untangle';
             description = `ネスト${health.maxNesting}段 → 早期リターンで浅くします`;
-          } else if ((health.longestFunction ?? 0) > 80) {
+          } else if ((health.longestFunction ?? 0) > FUNCTION_LENGTH_THRESHOLD) {
             action = 'split';
             description = `${health.longestFunction}行の関数 → 小さく分割します`;
-          } else if (daysSince > 3) {
+          } else if (daysSince > STALE_DAYS) {
             action = 'wake';
             description = `${Math.floor(daysSince)}日間放置 → レビューして最新化します`;
           } else {
@@ -477,8 +471,7 @@ export function activate(context: vscode.ExtensionContext): void {
             sendHealCommand(aiTerminal.terminal, message.action, approvedCreature);
           }
           creatureManager.feed(message.creatureId);
-          sendWorldUpdate();
-          saveState();
+          syncAndSave();
         }
         return true;
       }
@@ -494,19 +487,16 @@ export function activate(context: vscode.ExtensionContext): void {
           }
         }
         creatureManager.feed(message.targetId);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       }
       case 'nameCreature':
         creatureManager.renameCreature(message.creatureId, message.name);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       case 'moveCreature':
         creatureManager.moveCreature(message.creatureId, message.position);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       case 'revealFile': {
         const revealCreature = creatureManager.getById(message.creatureId);
@@ -518,8 +508,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case 'clearAllCreatures':
         creatureManager.loadCreatures([]);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       default:
         return false;
@@ -542,8 +531,7 @@ export function activate(context: vscode.ExtensionContext): void {
           terminal.show();
           agentManager.updateStatus(agent.id, 'running');
           panelProvider.postMessage({ type: 'agentAdded', agentId: agent.id });
-          sendWorldUpdate();
-          saveState();
+          syncAndSave();
         })();
         return true;
       }
@@ -558,8 +546,7 @@ export function activate(context: vscode.ExtensionContext): void {
           delTerminal.dispose();
         }
         agentManager.removeAgent(message.agentId);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       }
       case 'stopAgent': {
@@ -570,8 +557,7 @@ export function activate(context: vscode.ExtensionContext): void {
           stopTerminal.dispose();
         }
         agentManager.removeAgent(message.agentId);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       }
       case 'moveAgent':
@@ -593,12 +579,10 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       case 'sitAgent':
         agentManager.toggleSit(message.agentId);
-        sendWorldUpdate();
-        saveState();
+        syncAndSave();
         return true;
       case 'chatAgent':
-        // eslint-disable-next-line no-console -- placeholder
-        console.debug(`[Digital Life] chatAgent: ${message.agentId}`);
+        // Chat agent messages are handled by the terminal directly
         return true;
       default:
         return false;
@@ -651,8 +635,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (storedTerminal === closedTerminal) {
           agentTerminals.delete(agentId);
           agentManager.removeAgent(agentId);
-          sendWorldUpdate();
-          saveState();
+          syncAndSave();
           return;
         }
       }
@@ -806,8 +789,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       if (count > 0) {
-        saveState();
-        sendWorldUpdate();
+        syncAndSave();
       }
     })
   );
@@ -927,6 +909,12 @@ export function activate(context: vscode.ExtensionContext): void {
       agents: agentManager.getAll(),
     };
     panelProvider.postMessage(msg);
+  }
+
+  /** Convenience: broadcast current state and persist — the most common two-liner */
+  function syncAndSave(): void {
+    sendWorldUpdate();
+    saveState();
   }
 
   // Throttled status bar updates (every 5 seconds max)

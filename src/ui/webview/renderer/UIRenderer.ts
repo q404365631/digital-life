@@ -1,5 +1,5 @@
 import { Weather, CodingDNA, CreatureData } from '../../../types';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../../../constants';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, STALE_DAYS } from '../../../constants';
 import { CLOUD_PALETTE, CLOUD_SPRITE } from '../sprites/EnvironmentSprites';
 import { t } from '../i18n';
 
@@ -39,12 +39,12 @@ export class UIRenderer {
     for (const c of active) {
       const h = c.fileHealth;
       lvSum += c.level;
-      const stale = (Date.now() - h.lastModified) / 864e5; // days
+      const stale = (Date.now() - h.lastModified) / MS_PER_DAY;
 
       if (h.bugCount > 0)                          { sick++;    }
-      else if (h.lineCount > 300)                   { heavy++;   }
-      else if ((h.maxNesting ?? 0) > 8 || (h.longestFunction ?? 0) > 80) { tangled++; }
-      else if (stale > 3)                           { sleepy++;  }
+      else if (h.lineCount > LINE_COUNT_HEAVY)        { heavy++;   }
+      else if ((h.maxNesting ?? 0) > NESTING_THRESHOLD || (h.longestFunction ?? 0) > FUNCTION_LENGTH_THRESHOLD) { tangled++; }
+      else if (stale > STALE_DAYS)                   { sleepy++;  }
       else                                          { happy++;   }
     }
 

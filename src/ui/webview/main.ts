@@ -439,12 +439,6 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
       break;
     }
 
-    case 'diary': {
-      // Legacy — kept for compat but no longer triggered by morning briefing
-      eventSpeechOverrides.set(message.creatureId, { text: message.entry, timestamp: Date.now() });
-      break;
-    }
-
     case 'nudgeCreature': {
       // Morning wake-up: gently highlight the creature that needs attention.
       // The creature's own mood bubble (hungry/sick/etc.) speaks for itself — no AI narrator.
@@ -652,10 +646,6 @@ function findCreatureAtCanvasPosWithDist(worldX: number, worldY: number): { id: 
 
   // Return Infinity when nothing found so agent comparison always wins
   return { id: closestId, dist: closestId ? closestDist : Infinity };
-}
-
-function findAgentAtCanvasPos(worldX: number, worldY: number): string | null {
-  return findAgentAtCanvasPosWithDist(worldX, worldY).id;
 }
 
 function findAgentAtCanvasPosWithDist(worldX: number, worldY: number): { id: string | null; dist: number } {

@@ -1,4 +1,5 @@
 import { CreatureData, AgentData, SpriteData, ColorPalette, GraveStone } from '../../../types';
+import { MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD, LINE_COUNT_HEAVY, LINE_COUNT_OBESE, LINE_COUNT_CRITICAL, STALE_DAYS } from '../../../constants';
 import { t } from '../i18n';
 // Default palette for sprite cache key generation (formerly in PuffSprites.ts)
 const DEFAULT_PALETTE: ColorPalette = [
@@ -117,7 +118,7 @@ export class SpriteRenderer {
 
     const lineCount = creature.fileHealth?.lineCount ?? 0;
     let scaleX = 1.0;
-    if (lineCount > 300) {
+    if (lineCount > LINE_COUNT_HEAVY) {
       scaleX = 1.3;
     } else if (lineCount > 100) {
       scaleX = 1.15;
@@ -367,17 +368,17 @@ export class SpriteRenderer {
     if (this.healedIds.has(creature.id)) return t('bubble_healed');
 
     const h = creature.fileHealth;
-    const stale = (Date.now() - h.lastModified) / 864e5;
+    const stale = (Date.now() - h.lastModified) / MS_PER_DAY;
 
     // Feature B: Richer emotional vocabulary based on specific conditions
     if (creature.hunger < 10)   return t('bubble_starving');
     if (creature.hunger < 20)   return t('bubble_hungry');
     if (h.bugCount > 5)         return t('bubble_very_sick');
     if (h.bugCount > 2)         return t('bubble_sick');
-    if (h.lineCount > 500)      return t('bubble_very_heavy');
-    if (h.lineCount > 400)      return t('bubble_heavy');
-    if ((h.maxNesting ?? 0) > 8) return t('bubble_tangled');
-    if ((h.longestFunction ?? 0) > 80) return t('bubble_bloated');
+    if (h.lineCount > LINE_COUNT_CRITICAL)  return t('bubble_very_heavy');
+    if (h.lineCount > LINE_COUNT_OBESE)    return t('bubble_heavy');
+    if ((h.maxNesting ?? 0) > NESTING_THRESHOLD) return t('bubble_tangled');
+    if ((h.longestFunction ?? 0) > FUNCTION_LENGTH_THRESHOLD) return t('bubble_bloated');
     if (stale > 10)             return t('bubble_abandoned');
     if (stale > 5)              return t('bubble_sleepy');
     if (creature.happiness > 80 && h.bugCount === 0 && h.lineCount < 200) return t('bubble_perfect');
