@@ -283,22 +283,29 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
   if (draggingAgentId) {
     const agentId = draggingAgentId;
     const override = dragOverridePositions.get(agentId);
-    if (override && dragMoved) {
-      vscode.postMessage({ type: 'moveAgent', agentId, position: override });
-    } else if (!dragMoved) {
-      // Tap (no drag): select agent + switch terminal
-      selectedAgentId = agentId;
-      renderer.setSelectedAgentId(agentId);
-      soundEngine.playSelectAgent();
-      // Use addAgent with switch: prefix — the ONLY reliable message path
-      vscode.postMessage({ type: 'addAgent', agentType: `switch:${agentId}` as any });
-      tapHandledByPointerUp = true;
-    }
+    const wasDragged = dragMoved;
+
+    // Clean up pointer capture FIRST — before any postMessage
     dragOverridePositions.delete(agentId);
     draggingAgentId = null;
     dragMoved = false;
     canvas.classList.remove('dragging-creature');
     canvas.releasePointerCapture(event.pointerId);
+
+    if (override && wasDragged) {
+      vscode.postMessage({ type: 'moveAgent', agentId, position: override });
+    } else if (!wasDragged) {
+      // Tap (no drag): select agent + switch terminal
+      selectedAgentId = agentId;
+      renderer.setSelectedAgentId(agentId);
+      soundEngine.playSelectAgent();
+      tapHandledByPointerUp = true;
+      // Defer postMessage to break out of pointer event context
+      const switchId = agentId;
+      setTimeout(() => {
+        vscode.postMessage({ type: 'addAgent', agentType: `switch:${switchId}` as any });
+      }, 0);
+    }
     return;
   }
 
@@ -527,7 +534,10 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     selectedAgentId = agentHit;
     renderer.setSelectedAgentId(agentHit);
     soundEngine.playSelectAgent();
-    vscode.postMessage({ type: 'addAgent', agentType: `switch:${agentHit}` as any });
+    const switchId = agentHit;
+    setTimeout(() => {
+      vscode.postMessage({ type: 'addAgent', agentType: `switch:${switchId}` as any });
+    }, 0);
     return;
   }
 
