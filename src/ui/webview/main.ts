@@ -159,14 +159,14 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     console.log(`[DL-WV] pointerdown: agentHit=${agentHit} (${agentDist.toFixed(1)}), creatureHit=${creatureHit} (${creatureDist.toFixed(1)}), agents.length=${agents.length}`);
 
     // Agent wins tie (larger sprite, harder to miss)
+    // Do NOT call setPointerCapture here — it kills the click event.
+    // Pointer capture is deferred to pointermove if actual drag starts.
     if (agentHit && agentDist <= creatureDist) {
       draggingAgentId = agentHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       dragMoved = false;
       dragOverridePositions.set(agentHit, { x: worldPos.x, y: worldPos.y });
-      canvas.classList.add('dragging-creature');
-      canvas.setPointerCapture(event.pointerId);
       return;
     }
 
@@ -236,6 +236,11 @@ canvas.addEventListener('pointermove', (event: PointerEvent) => {
     const dx = event.clientX - dragStartX;
     const dy = event.clientY - dragStartY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      if (!dragMoved) {
+        // First real movement — capture pointer for smooth dragging
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add('dragging-creature');
+      }
       dragMoved = true;
     }
     return;
@@ -285,23 +290,17 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
     const override = dragOverridePositions.get(agentId);
     const wasDragged = dragMoved;
 
-    // Clean up pointer capture FIRST — before any postMessage
+    // Clean up state
     dragOverridePositions.delete(agentId);
     draggingAgentId = null;
     dragMoved = false;
-    canvas.classList.remove('dragging-creature');
-    canvas.releasePointerCapture(event.pointerId);
-
-    if (override && wasDragged) {
-      vscode.postMessage({ type: 'moveAgent', agentId, position: override });
-    } else if (!wasDragged) {
-      // Tap (no drag): visual selection only — let click handler send selectAgent
-      // (postMessage doesn't work inside pointerup in VS Code webview)
-      selectedAgentId = agentId;
-      renderer.setSelectedAgentId(agentId);
-      soundEngine.playSelectAgent();
-      // Don't set tapHandledByPointerUp — let click handler fire and send selectAgent
+    if (wasDragged) {
+      // Only release capture if we actually captured (drag started)
+      canvas.classList.remove('dragging-creature');
+      canvas.releasePointerCapture(event.pointerId);
+      vscode.postMessage({ type: 'moveAgent', agentId, position: override! });
     }
+    // If not dragged (tap), do nothing here — let click handler handle it
     return;
   }
 
@@ -530,8 +529,7 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     selectedAgentId = agentHit;
     renderer.setSelectedAgentId(agentHit);
     soundEngine.playSelectAgent();
-    // DEBUG: send addAgent to test if this code path runs at all
-    vscode.postMessage({ type: 'addAgent', agentType: 'copilot' });
+    vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
     return;
   }
 
