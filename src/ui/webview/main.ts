@@ -156,17 +156,13 @@ canvas.addEventListener('pointerdown', (event: PointerEvent) => {
     // Find nearest creature AND agent — pick whichever is closest
     const { id: creatureHit, dist: creatureDist } = findCreatureAtCanvasPosWithDist(worldPos.x, worldPos.y);
     const { id: agentHit, dist: agentDist } = findAgentAtCanvasPosWithDist(worldPos.x, worldPos.y);
-    console.log(`[DL-WV] pointerdown: agentHit=${agentHit} (${agentDist.toFixed(1)}), creatureHit=${creatureHit} (${creatureDist.toFixed(1)}), agents.length=${agents.length}`);
-
     // Agent tap: send selectAgent immediately from pointerdown
     // (Pixel Agents pattern: detect + message in same handler, no pointer capture)
     if (agentHit && agentDist <= creatureDist) {
       selectedAgentId = agentHit;
       renderer.setSelectedAgentId(agentHit);
       soundEngine.playSelectAgent();
-      // Test: send BOTH messages to see which ones arrive at extension
       vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
-      vscode.postMessage({ type: 'addAgent', agentType: 'copilot' });
       draggingAgentId = agentHit;
       dragStartX = event.clientX;
       dragStartY = event.clientY;

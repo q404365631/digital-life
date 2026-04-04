@@ -560,16 +560,9 @@ export function activate(context: vscode.ExtensionContext): void {
         })();
         return true;
       }
-      case 'clickAgent': {
-        // Also handle terminal switching (same as selectAgent)
-        agentManager.selectAgent(message.agentId);
-        const clickTerminal = agentTerminals.get(message.agentId);
-        if (clickTerminal && !clickTerminal.exitStatus) {
-          clickTerminal.show(false);
-        }
-        sendWorldUpdate();
-        return true;
-      }
+      case 'clickAgent':
+        // Alias — handled same as selectAgent
+        return handleAgentMessage({ ...message, type: 'selectAgent' });
       case 'deleteAgent': {
         // Close the terminal too — terminal and agent are one unit
         const delTerminal = agentTerminals.get(message.agentId);
@@ -603,14 +596,10 @@ export function activate(context: vscode.ExtensionContext): void {
         sendWorldUpdate();
         return true;
       case 'selectAgent': {
-        const allTerminalIds = [...agentTerminals.keys()];
         const selTerminal = agentTerminals.get(message.agentId);
-        void vscode.window.showInformationMessage(
-          `[selectAgent] id="${message.agentId}" found=${!!selTerminal} terminals=[${allTerminalIds.join(',')}]`
-        );
         agentManager.selectAgent(message.agentId);
         if (selTerminal && !selTerminal.exitStatus) {
-          selTerminal.show();
+          selTerminal.show(false);
         }
         sendWorldUpdate();
         return true;
@@ -714,8 +703,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
-    // DEBUG: log ALL messages to confirm delivery
-    void vscode.window.showInformationMessage(`MSG: ${message.type} ${JSON.stringify(message).slice(0, 80)}`);
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
