@@ -699,18 +699,35 @@ export function activate(context: vscode.ExtensionContext): void {
   let lastWeatherFetch = 0;
   const WEATHER_FETCH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
-  /** Simple HTTPS GET that returns parsed JSON (Node.js — no fetch API) */
-  function httpsGetJson(url: string): Promise<unknown> {
+  /** HTTPS GET with redirect support (Node.js — no fetch API) */
+  function httpsGetJson(url: string, maxRedirects = 3): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      https.get(url, (res) => {
+      const req = https.get(url, (res) => {
+        // Follow redirects (301, 302, 307, 308)
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          if (maxRedirects <= 0) { reject(new Error('Too many redirects')); return; }
+          httpsGetJson(res.headers.location, maxRedirects - 1).then(resolve, reject);
+          return;
+        }
         let body = '';
         res.on('data', (chunk: string) => { body += chunk; });
         res.on('end', () => {
           try { resolve(JSON.parse(body)); }
-          catch { reject(new Error('Invalid JSON')); }
+          catch { reject(new Error(`Invalid JSON from ${url}`)); }
         });
-      }).on('error', reject);
+      });
+      req.on('error', reject);
+      req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
     });
+  }
+
+  /** Get fallback coordinates from VS Code locale */
+  function getFallbackCoords(): { lat: string; lon: string } {
+    const lang = vscode.env.language;
+    if (lang.startsWith('ja')) return { lat: '35.68', lon: '139.69' }; // Tokyo
+    if (lang.startsWith('ko')) return { lat: '37.57', lon: '126.98' }; // Seoul
+    if (lang.startsWith('zh')) return { lat: '31.23', lon: '121.47' }; // Shanghai
+    return { lat: '37.77', lon: '-122.42' }; // San Francisco (default)
   }
 
   async function fetchRealWeather(): Promise<void> {
@@ -719,10 +736,22 @@ export function activate(context: vscode.ExtensionContext): void {
     lastWeatherFetch = now;
 
     try {
-      // Use ipinfo.io to get approximate location (city-level, no GPS needed)
-      const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
-      if (!geo.loc) return;
-      const [lat, lon] = geo.loc.split(',');
+      // Try to get location from ipinfo.io, fall back to locale-based coords
+      let lat: string;
+      let lon: string;
+      try {
+        const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
+        if (geo.loc) {
+          [lat, lon] = geo.loc.split(',');
+        } else {
+          const fb = getFallbackCoords();
+          lat = fb.lat; lon = fb.lon;
+        }
+      } catch (geoErr) {
+        outputChannel.appendLine(`[Digital Life] Geo lookup failed: ${geoErr}, using fallback`);
+        const fb = getFallbackCoords();
+        lat = fb.lat; lon = fb.lon;
+      }
 
       // Fetch current weather from Open-Meteo
       const data = await httpsGetJson(
@@ -741,10 +770,10 @@ export function activate(context: vscode.ExtensionContext): void {
       else rw = null;
 
       worldState = updateRealWeather(worldState, rw);
-      sendWorldUpdate(); // Push updated weather to webview immediately
-      outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code})`);
-    } catch {
-      // Network error — silently continue with null weather
+      sendWorldUpdate();
+      outputChannel.appendLine(`[Digital Life] Real weather: ${rw} (code ${code}, lat=${lat}, lon=${lon})`);
+    } catch (err) {
+      outputChannel.appendLine(`[Digital Life] Weather fetch failed: ${err}`);
     }
   }
 
