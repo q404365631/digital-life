@@ -1,4 +1,4 @@
-import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, ReactionType, Species, CodingDNA } from '../types';
+import { CreatureData, CreatureMood, CreatureStage, AnimationState, Position, Species, CodingDNA } from '../types';
 import { defaultDNA } from './DNAAnalyzer';
 import { getPersonality, Personality } from '../ai/SpeechTemplates';
 import {
@@ -13,14 +13,6 @@ function generateId(): string {
 }
 
 function randomPosition(): Position {
-  const margin = SPRITE_SIZE * 2;
-  return {
-    x: margin + Math.floor(Math.random() * (CANVAS_WIDTH - margin * 2)),
-    y: margin + Math.floor(Math.random() * (CANVAS_HEIGHT - margin * 2)),
-  };
-}
-
-function randomTarget(): Position {
   const margin = SPRITE_SIZE * 2;
   return {
     x: margin + Math.floor(Math.random() * (CANVAS_WIDTH - margin * 2)),
@@ -104,16 +96,16 @@ export function updateHatchProgress(creature: CreatureData, deltaMs: number): Cr
   if (newProgress >= 100) {
     return {
       ...creature,
-      stage: 'baby' as CreatureStage,
+      stage: 'baby',
       hatchProgress: 100,
-      animationState: 'idle' as AnimationState,
+      animationState: 'idle',
     };
   }
 
   return {
     ...creature,
     hatchProgress: newProgress,
-    animationState: 'hatch' as AnimationState,
+    animationState: 'hatch',
   };
 }
 
@@ -146,10 +138,10 @@ export function feedCreature(creature: CreatureData): CreatureData {
     ...withExp,
     hunger: newHunger,
     mood: calculateMood(newHunger, withExp.happiness),
-    animationState: 'eat' as AnimationState,
+    animationState: 'eat',
     animationFrame: 0,
     lastFed: Date.now(),
-    reactionType: 'feed' as ReactionType,
+    reactionType: 'feed',
     reactionTimer: REACTION_DURATION,
   };
 }
@@ -165,10 +157,10 @@ export function petCreature(creature: CreatureData): CreatureData {
     ...withExp,
     happiness: newHappiness,
     mood: calculateMood(withExp.hunger, newHappiness),
-    animationState: 'happy' as AnimationState,
+    animationState: 'happy',
     animationFrame: 0,
     lastPetted: Date.now(),
-    reactionType: 'pet' as ReactionType,
+    reactionType: 'pet',
     reactionTimer: REACTION_DURATION,
   };
 }
@@ -184,7 +176,7 @@ export function updateReactionTimer(creature: CreatureData, deltaMs: number): Cr
       ...creature,
       reactionType: null,
       reactionTimer: 0,
-      animationState: 'idle' as AnimationState,
+      animationState: 'idle',
     };
   }
 
@@ -203,30 +195,28 @@ export function updateReactionTimer(creature: CreatureData, deltaMs: number): Cr
  *   shy     → hugs edges, small steps, rarely moves
  */
 
-const PERSONALITY_SPEED: Record<Personality, number> = {
-  active: 1.4,  calm: 0.7,  curious: 1.0,  shy: 0.6,
-};
-const PERSONALITY_MOVE_CHANCE: Record<Personality, number> = {
-  active: 0.018,  calm: 0.006,  curious: 0.014,  shy: 0.004,
-};
-const PERSONALITY_RANGE: Record<Personality, number> = {
-  active: 0.8,  calm: 0.3,  curious: 1.0,  shy: 0.25,
+const PERSONALITY_CONFIG: Record<Personality, { speed: number; moveChance: number; range: number }> = {
+  active:  { speed: 1.4,  moveChance: 0.018,  range: 0.8  },
+  calm:    { speed: 0.7,  moveChance: 0.006,  range: 0.3  },
+  curious: { speed: 1.0,  moveChance: 0.014,  range: 1.0  },
+  shy:     { speed: 0.6,  moveChance: 0.004,  range: 0.25 },
 };
 
 function personalityTarget(personality: Personality, from: Position): Position {
   const margin = SPRITE_SIZE * 2;
-  const range = PERSONALITY_RANGE[personality];
+  const { range } = PERSONALITY_CONFIG[personality];
   const w = (CANVAS_WIDTH - margin * 2) * range;
   const h = (CANVAS_HEIGHT - margin * 2) * range;
 
   if (personality === 'shy') {
     // Prefer edges — pick a random edge and place target near it
+    const edgeBand = SPRITE_SIZE * 2.5; // how close to the wall shy creatures stay
     const edge = Math.floor(Math.random() * 4);
     switch (edge) {
-      case 0: return { x: margin + Math.random() * 40, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
-      case 1: return { x: CANVAS_WIDTH - margin - Math.random() * 40, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
-      case 2: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: margin + Math.random() * 40 };
-      default: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: CANVAS_HEIGHT - margin - Math.random() * 40 };
+      case 0: return { x: margin + Math.random() * edgeBand, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
+      case 1: return { x: CANVAS_WIDTH - margin - Math.random() * edgeBand, y: margin + Math.random() * (CANVAS_HEIGHT - margin * 2) };
+      case 2: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: margin + Math.random() * edgeBand };
+      default: return { x: margin + Math.random() * (CANVAS_WIDTH - margin * 2), y: CANVAS_HEIGHT - margin - Math.random() * edgeBand };
     }
   }
 
@@ -255,11 +245,12 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
   const personality = getPersonality(creature.dna);
 
   // Personality + DNA velocity combined for final speed
-  const speedMultiplier = PERSONALITY_SPEED[personality] * (0.7 + creature.dna.velocity * 0.6);
+  const pc = PERSONALITY_CONFIG[personality];
+  const speedMultiplier = pc.speed * (0.7 + creature.dna.velocity * 0.6);
   const speed = CREATURE_SPEED * speedMultiplier;
 
   if (!creature.targetPosition) {
-    const moveChance = PERSONALITY_MOVE_CHANCE[personality];
+    const moveChance = pc.moveChance;
 
     if (Math.random() < moveChance) {
       const target = personalityTarget(personality, creature.position);
@@ -275,7 +266,7 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
     }
     return {
       ...creature,
-      animationState: 'idle' as AnimationState,
+      animationState: 'idle',
     };
   }
 
@@ -288,7 +279,7 @@ export function updateCreatureMovement(creature: CreatureData): CreatureData {
       ...creature,
       position: creature.targetPosition,
       targetPosition: null,
-      animationState: 'idle' as AnimationState,
+      animationState: 'idle',
       animationFrame: 0,
     };
   }
@@ -314,15 +305,15 @@ export function setCreatureMoodByBugs(creature: CreatureData, hasBugs: boolean):
   if (hasBugs) {
     return {
       ...creature,
-      mood: 'sad' as CreatureMood,
-      animationState: 'sad' as AnimationState,
+      mood: 'sad',
+      animationState: 'sad',
     };
   }
 
   return {
     ...creature,
     mood: calculateMood(creature.hunger, creature.happiness),
-    animationState: 'idle' as AnimationState,
+    animationState: 'idle',
   };
 }
 

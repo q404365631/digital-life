@@ -85,8 +85,8 @@ export class AgentManager {
       return;
     }
 
-    const newX = Math.max(16, Math.min(CANVAS_WIDTH - 16, agent.position.x + dx));
-    const newY = Math.max(16, Math.min(CANVAS_HEIGHT - 16, agent.position.y + dy));
+    const newX = Math.max(SPRITE_SIZE, Math.min(CANVAS_WIDTH - SPRITE_SIZE, agent.position.x + dx));
+    const newY = Math.max(SPRITE_SIZE, Math.min(CANVAS_HEIGHT - SPRITE_SIZE, agent.position.y + dy));
 
     this.agents.set(agentId, {
       ...agent,

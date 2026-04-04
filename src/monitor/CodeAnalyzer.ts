@@ -3,6 +3,8 @@ import * as path from 'path';
 import { BUG_PATTERNS } from '../constants';
 import { FileHealth } from '../types';
 
+const FUNC_DECLARATION = /^\s*(?:export\s+)?(?:async\s+)?(?:function|const\s+\w+\s*=|(?:public|private|protected)\s+)/;
+
 export class CodeAnalyzer {
   private customPatterns: RegExp[] = [];
 
@@ -41,14 +43,7 @@ export class CodeAnalyzer {
       const lines = content.split('\n');
       const lineCount = lines.length;
 
-      let bugCount = 0;
-      for (const pattern of this.getAllPatterns()) {
-        const regex = new RegExp(pattern.source, pattern.flags);
-        const matches = content.match(regex);
-        if (matches) {
-          bugCount += matches.length;
-        }
-      }
+      const bugCount = this.countBugs(content);
 
       const stat = fs.statSync(filePath);
       const lastModified = stat.mtimeMs;
@@ -82,12 +77,10 @@ export class CodeAnalyzer {
     let longest = 0;
     let currentStart = -1;
     let braceDepth = 0;
-    const funcPattern = /^\s*(?:export\s+)?(?:async\s+)?(?:function|const\s+\w+\s*=|(?:public|private|protected)\s+)/;
-
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim();
 
-      if (funcPattern.test(trimmed) && currentStart === -1) {
+      if (FUNC_DECLARATION.test(trimmed) && currentStart === -1) {
         currentStart = i;
       }
 
@@ -113,8 +106,9 @@ export class CodeAnalyzer {
   private countBugs(content: string): number {
     let count = 0;
     for (const pattern of this.getAllPatterns()) {
-      const regex = new RegExp(pattern.source, pattern.flags);
-      const matches = content.match(regex);
+      // Reset lastIndex before each match (RegExp with /g flag is stateful)
+      pattern.lastIndex = 0;
+      const matches = content.match(pattern);
       if (matches) {
         count += matches.length;
       }
