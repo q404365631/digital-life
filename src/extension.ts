@@ -603,10 +603,14 @@ export function activate(context: vscode.ExtensionContext): void {
         sendWorldUpdate();
         return true;
       case 'selectAgent': {
-        agentManager.selectAgent(message.agentId);
+        const allTerminalIds = [...agentTerminals.keys()];
         const selTerminal = agentTerminals.get(message.agentId);
+        void vscode.window.showInformationMessage(
+          `[selectAgent] id="${message.agentId}" found=${!!selTerminal} terminals=[${allTerminalIds.join(',')}]`
+        );
+        agentManager.selectAgent(message.agentId);
         if (selTerminal && !selTerminal.exitStatus) {
-          selTerminal.show(false);
+          selTerminal.show();
         }
         sendWorldUpdate();
         return true;
