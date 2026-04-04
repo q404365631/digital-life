@@ -60,13 +60,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 6px 8px;
   background: #E8DDD0;
   border-top: 1px solid #D4C4B0;
-  height: 44px;
-  min-height: 44px;
+  min-height: 36px;
   flex-shrink: 0;
-  gap: 8px;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 #toolbar-left {
@@ -78,7 +78,9 @@ body {
 #toolbar-center {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 #toolbar-right {
@@ -93,12 +95,12 @@ body {
 }
 
 .tool-btn {
-  padding: 4px 12px;
+  padding: 3px 8px;
   border: 1px solid #C4B49A;
   border-radius: 6px;
   background: #F0E8DA;
   color: #5D4E37;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;

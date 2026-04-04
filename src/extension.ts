@@ -561,7 +561,13 @@ export function activate(context: vscode.ExtensionContext): void {
         return true;
       }
       case 'clickAgent': {
-        // Terminal switching now handled by selectAgent
+        // Also handle terminal switching (same as selectAgent)
+        agentManager.selectAgent(message.agentId);
+        const clickTerminal = agentTerminals.get(message.agentId);
+        if (clickTerminal && !clickTerminal.exitStatus) {
+          clickTerminal.show(false);
+        }
+        sendWorldUpdate();
         return true;
       }
       case 'deleteAgent': {
