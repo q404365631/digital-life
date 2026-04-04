@@ -664,6 +664,7 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         void fetchISSLocation();
         void fetchNEOData();
+        void fetchAndSpeakCatFact();
         return true;
       case 'spawnFile': {
         if (!creatureManager.hasCreatureForFile(message.filePath) && creatureManager.getCount() < MAX_CREATURES) {
@@ -909,6 +910,99 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  // ── Cat Facts for Dot creatures (catfact.ninja — free, no API key) ──
+  const CAT_FACTS_FALLBACK = [
+    '🐱 Cats sleep 12-16 hours a day',
+    '🐱 A group of cats is called a clowder',
+    '🐱 Cats have over 20 vocalizations',
+    '🐱 A cat\'s purr vibrates at 25-150 Hz',
+    '🐱 Cats can rotate their ears 180°',
+    '🐱 Cats spend 30-50% of their day grooming',
+    '🐱 A cat can jump up to 6x its length',
+    '🐱 Cats have 230 bones (humans have 206)',
+    '🐱 The oldest known cat lived to 38 years',
+    '🐱 Cats can\'t taste sweetness',
+    '🐱 A cat\'s nose print is unique like a fingerprint',
+    '🐱 Cats have 3 eyelids',
+    '🐱 A cat\'s brain is 90% similar to a human\'s',
+    '🐱 Cats can hear ultrasonic sounds',
+    '🐱 Nikola Tesla was inspired to study electricity by his cat',
+    '🐱 The first cat in space was French, named Félicette',
+    '🐱 Cats can dream just like humans',
+    '🐱 A cat\'s whiskers are as wide as its body',
+    '🐱 Ancient Egyptians shaved their eyebrows when their cat died',
+    '🐱 Cats can run up to 48 km/h',
+  ];
+  // Japanese cat facts for ja locale
+  const CAT_FACTS_JA = [
+    '🐱 猫は1日12〜16時間寝る',
+    '🐱 猫の集団は「クラウダー」と呼ばれる',
+    '🐱 猫は20種類以上の鳴き声を使い分ける',
+    '🐱 猫のゴロゴロは25〜150Hzで振動する',
+    '🐱 猫は耳を180°回転できる',
+    '🐱 猫は1日の30〜50%を毛づくろいに使う',
+    '🐱 猫は体長の6倍ジャンプできる',
+    '🐱 猫の骨は230本（人間は206本）',
+    '🐱 最長寿の猫は38歳まで生きた',
+    '🐱 猫は甘味を感じられない',
+    '🐱 猫の鼻紋は指紋のように一匹一匹違う',
+    '🐱 猫にはまぶたが3つある',
+    '🐱 猫の脳は人間の脳と90%類似している',
+    '🐱 猫は超音波を聞き取れる',
+    '🐱 テスラは飼い猫に触発されて電気の研究を始めた',
+    '🐱 宇宙に行った最初の猫はフランスのフェリセット',
+    '🐱 猫も人間と同じように夢を見る',
+    '🐱 猫のヒゲの幅は体の幅とほぼ同じ',
+    '🐱 古代エジプトでは猫が死ぬと飼い主は眉を剃った',
+    '🐱 猫は時速48kmで走れる',
+  ];
+  let catFactCache: string[] = [];
+  let lastCatFactTime = 0;
+  const CAT_FACT_INTERVAL = 5 * 60 * 1000; // every 5 minutes
+
+  async function fetchAndSpeakCatFact(): Promise<void> {
+    const now = Date.now();
+    if (now - lastCatFactTime < CAT_FACT_INTERVAL) return;
+
+    // Find a Dot creature to speak
+    const dots = creatureManager.getAll().filter(c => c.species === 'dot' && c.stage !== 'egg');
+    if (dots.length === 0) return;
+    lastCatFactTime = now;
+
+    const speaker = dots[Math.floor(Math.random() * dots.length)];
+    let fact: string;
+
+    // Try to fetch from API, fall back to local facts
+    try {
+      if (catFactCache.length === 0) {
+        const data = await httpsGetJson('https://catfact.ninja/facts?limit=10') as {
+          data?: { fact: string }[];
+        };
+        if (data.data && data.data.length > 0) {
+          catFactCache = data.data.map(d => `🐱 ${d.fact}`);
+        }
+      }
+    } catch {
+      // API failed, use fallback
+    }
+
+    if (catFactCache.length > 0) {
+      fact = catFactCache.pop()!;
+    } else {
+      // Use locale-appropriate fallback
+      const facts = speechLang === 'ja' ? CAT_FACTS_JA : CAT_FACTS_FALLBACK;
+      fact = facts[Math.floor(Math.random() * facts.length)];
+    }
+
+    // Truncate long facts for speech bubble
+    if (fact.length > 60) {
+      fact = fact.slice(0, 57) + '...';
+    }
+
+    panelProvider.postMessage({ type: 'creatureSpeech', creatureId: speaker.id, text: fact });
+    outputChannel.appendLine(`[Digital Life] Cat fact: ${fact}`);
+  }
+
   // ── Late-night coding awareness ──
   let lateNightWarned = false;
 
@@ -976,6 +1070,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       void fetchISSLocation();
       void fetchNEOData();
+      void fetchAndSpeakCatFact();
     }
   }
 
