@@ -664,6 +664,11 @@ function applyToolbarLabels(): void {
   const addAgent = document.getElementById('btn-add-agent');
   if (addAgent)   { addAgent.textContent = '+ ' + t('tt_add_agent'); addAgent.title = t('tt_add_agent'); }
   if (btnScreenshot) { btnScreenshot.title = t('tt_screenshot'); }
+  // Dynamic buttons (care approval)
+  const approveEl = document.getElementById('btn-approve-ai');
+  if (approveEl) { approveEl.textContent = t('approve'); }
+  const cancelEl = document.getElementById('btn-cancel-ai');
+  if (cancelEl) { cancelEl.textContent = t('cancel'); }
 }
 
 // ============================================================
