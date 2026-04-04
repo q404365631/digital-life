@@ -45,6 +45,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // Direct terminal references — the ONLY source of truth for agent→terminal mapping
   const agentTerminals: Map<string, vscode.Terminal> = new Map();
   const outputChannel = vscode.window.createOutputChannel('Digital Life');
+  outputChannel.appendLine(`[Digital Life] Extension activated at ${new Date().toISOString()}`);
+  outputChannel.show(true);
   let worldState: WorldData;
 
   // Restore state
@@ -722,6 +724,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   panelProvider.onMessage((message) => {
+    outputChannel.appendLine(`[MSG] type="${message.type}" data=${JSON.stringify(message).slice(0, 200)}`);
     handleCreatureMessage(message)
       || handleAgentMessage(message)
       || handleLifecycleMessage(message);
