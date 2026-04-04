@@ -449,6 +449,9 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
 
     case 'agentAdded': {
       soundEngine.playAgentSpawn();
+      // Auto-select the newly added agent
+      selectedAgentId = message.agentId;
+      renderer.setSelectedAgentId(message.agentId);
       break;
     }
 

@@ -552,39 +552,35 @@ export function activate(context: vscode.ExtensionContext): void {
           outputChannel.appendLine(`[switch] id="${switchId}" terminal=${switchTerminal?.name ?? 'NONE'} exit=${switchTerminal?.exitStatus ?? 'alive'} active="${activeTermName}" total=${allTerminals.length}`);
 
           if (switchTerminal && !switchTerminal.exitStatus) {
-            // Multi-strategy terminal switch
+            // Terminal switching: show terminal, then explicitly focus it
+            switchTerminal.show(false);
+            outputChannel.appendLine(`[switch] terminal.show(false) called for "${switchTerminal.name}"`);
+
+            // Also try VS Code command to ensure terminal panel has focus
             void (async () => {
-              // Strategy 1: terminal.show()
-              switchTerminal.show(false);
-              outputChannel.appendLine(`[switch] strategy1: terminal.show(false) called`);
+              await new Promise(r => setTimeout(r, 150));
+              // Check if show() alone worked
+              const currentActive = vscode.window.activeTerminal?.name ?? 'none';
+              outputChannel.appendLine(`[switch] after show(): activeTerminal="${currentActive}" target="${switchTerminal.name}"`);
 
-              // Wait briefly then check if it worked
-              await new Promise(r => setTimeout(r, 200));
-
-              if (vscode.window.activeTerminal === switchTerminal) {
-                outputChannel.appendLine(`[switch] strategy1 SUCCESS: activeTerminal matches`);
-                return;
-              }
-
-              // Strategy 2: Focus terminal panel, then cycle with focusNext
-              outputChannel.appendLine(`[switch] strategy1 failed, trying strategy2: focus+cycle`);
-              await vscode.commands.executeCommand('workbench.action.terminal.focus');
-              await new Promise(r => setTimeout(r, 100));
-
-              for (let i = 0; i < allTerminals.length; i++) {
-                if (vscode.window.activeTerminal === switchTerminal) {
-                  outputChannel.appendLine(`[switch] strategy2 SUCCESS at cycle ${i}`);
-                  return;
-                }
-                await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
+              if (vscode.window.activeTerminal !== switchTerminal) {
+                // show() didn't switch the tab — cycle through terminals
+                outputChannel.appendLine(`[switch] show() didn't work, cycling terminals...`);
+                await vscode.commands.executeCommand('workbench.action.terminal.focus');
                 await new Promise(r => setTimeout(r, 100));
+
+                for (let i = 0; i < allTerminals.length; i++) {
+                  const active = vscode.window.activeTerminal;
+                  outputChannel.appendLine(`[switch] cycle ${i}: active="${active?.name ?? 'none'}"`);
+                  if (active === switchTerminal) {
+                    outputChannel.appendLine(`[switch] FOUND target at cycle ${i}`);
+                    break;
+                  }
+                  await vscode.commands.executeCommand('workbench.action.terminal.focusNext');
+                  await new Promise(r => setTimeout(r, 100));
+                }
               }
-
-              // Strategy 3: Try show(true) with preserveFocus
-              outputChannel.appendLine(`[switch] strategy2 failed, trying strategy3: show(true)`);
-              switchTerminal.show(true);
-
-              outputChannel.appendLine(`[switch] all strategies attempted. activeTerminal="${vscode.window.activeTerminal?.name ?? 'none'}"`);
+              outputChannel.appendLine(`[switch] DONE. activeTerminal="${vscode.window.activeTerminal?.name ?? 'none'}"`);
             })();
           } else {
             outputChannel.appendLine(`[switch] terminal not found or exited. agentTerminals keys: [${[...agentTerminals.keys()].join(', ')}]`);
