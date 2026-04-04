@@ -3,10 +3,9 @@
   "tasks": [
     {
       "label": "build",
-      "type": "npm",
-      "script": "build",
-      "problemMatcher": ["$tsc-watch"],
-      "isBackground": false,
+      "type": "shell",
+      "command": "npx webpack --mode production; exit 0",
+      "problemMatcher": [],
       "presentation": {
         "reveal": "silent"
       }
