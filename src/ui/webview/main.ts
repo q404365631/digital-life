@@ -300,11 +300,8 @@ canvas.addEventListener('pointerup', (event: PointerEvent) => {
       renderer.setSelectedAgentId(agentId);
       soundEngine.playSelectAgent();
       tapHandledByPointerUp = true;
-      // Defer postMessage to break out of pointer event context
-      setTimeout(() => {
-        vscode.postMessage({ type: 'selectAgent', agentId });
-        vscode.postMessage({ type: 'clickAgent', agentId });
-      }, 0);
+      // Send directly — pointer capture already released above
+      vscode.postMessage({ type: 'selectAgent', agentId });
     }
     return;
   }
@@ -534,10 +531,7 @@ canvas.addEventListener('click', (event: MouseEvent) => {
     selectedAgentId = agentHit;
     renderer.setSelectedAgentId(agentHit);
     soundEngine.playSelectAgent();
-    setTimeout(() => {
-      vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
-      vscode.postMessage({ type: 'clickAgent', agentId: agentHit });
-    }, 0);
+    vscode.postMessage({ type: 'selectAgent', agentId: agentHit });
     return;
   }
 
@@ -607,7 +601,6 @@ btnSwitchAgent?.addEventListener('click', () => {
   renderer.setSelectedAgentId(agent.id);
   soundEngine.playSelectAgent();
   vscode.postMessage({ type: 'selectAgent', agentId: agent.id });
-  vscode.postMessage({ type: 'clickAgent', agentId: agent.id });
 });
 
 // Delete agent: long-press on selected agent (or via command palette)
