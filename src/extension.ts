@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as https from 'https';
 import { PanelProvider } from './ui/PanelProvider';
 import { MonitorManager } from './monitor/MonitorManager';
 import { CreatureManager } from './creature/CreatureManager';
 import { CreatureStorage } from './storage/CreatureStorage';
-import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather } from './world/WorldState';
+import { createInitialWorldState, updateWeather, setBugsInWorld, addGraveStone, updateTimeOfDay, updateRealWeather, getTimeOfDay } from './world/WorldState';
 import { RealWeather } from './types';
 import { getSpeciesForFile, loadCustomSpeciesMap } from './creature/SpeciesData';
 import { DNAAnalyzer, defaultDNA } from './creature/DNAAnalyzer';
@@ -63,8 +64,12 @@ export function activate(context: vscode.ExtensionContext): void {
   let isFirstRun = false;
   if (savedState) {
     creatureManager.loadCreatures(savedState.creatures);
-    worldState = savedState.world;
-    // Don't restore saved agents - start fresh each session
+    // Backfill new WorldData fields for saved states from older versions
+    worldState = {
+      ...savedState.world,
+      timeOfDay: savedState.world.timeOfDay ?? getTimeOfDay(),
+      realWeather: savedState.world.realWeather ?? null,
+    };
   } else {
     worldState = createInitialWorldState();
     isFirstRun = true;
@@ -690,6 +695,20 @@ export function activate(context: vscode.ExtensionContext): void {
   let lastWeatherFetch = 0;
   const WEATHER_FETCH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
+  /** Simple HTTPS GET that returns parsed JSON (Node.js — no fetch API) */
+  function httpsGetJson(url: string): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        let body = '';
+        res.on('data', (chunk: string) => { body += chunk; });
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); }
+          catch { reject(new Error('Invalid JSON')); }
+        });
+      }).on('error', reject);
+    });
+  }
+
   async function fetchRealWeather(): Promise<void> {
     const now = Date.now();
     if (now - lastWeatherFetch < WEATHER_FETCH_INTERVAL) return;
@@ -697,16 +716,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     try {
       // Use ipinfo.io to get approximate location (city-level, no GPS needed)
-      const geoRes = await fetch('https://ipinfo.io/json');
-      const geo = await geoRes.json() as { loc?: string };
+      const geo = await httpsGetJson('https://ipinfo.io/json') as { loc?: string };
       if (!geo.loc) return;
       const [lat, lon] = geo.loc.split(',');
 
       // Fetch current weather from Open-Meteo
-      const weatherRes = await fetch(
+      const data = await httpsGetJson(
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
-      );
-      const data = await weatherRes.json() as { current_weather?: { weathercode: number } };
+      ) as { current_weather?: { weathercode: number } };
       const code = data.current_weather?.weathercode ?? -1;
 
       // WMO weather codes → our simplified weather types
