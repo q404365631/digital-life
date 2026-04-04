@@ -60,6 +60,45 @@ export class GitWatcher {
     return this._lastCommitTime;
   }
 
+  /** Count consecutive days with at least one commit (streak) */
+  async getCommitStreak(): Promise<number> {
+    try {
+      // Fetch last 120 days of commits (enough for even long streaks)
+      const log = await this.git.log({ maxCount: 500 });
+      if (!log.all || log.all.length === 0) return 0;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Collect unique commit dates
+      const commitDays = new Set<number>();
+      for (const entry of log.all) {
+        const d = new Date(entry.date);
+        d.setHours(0, 0, 0, 0);
+        commitDays.add(d.getTime());
+      }
+
+      // Count consecutive days backward from today
+      let streak = 0;
+      const dayMs = 86_400_000;
+      let checkDay = today.getTime();
+
+      // Allow today or yesterday as the starting point
+      if (!commitDays.has(checkDay)) {
+        checkDay -= dayMs; // yesterday
+        if (!commitDays.has(checkDay)) return 0;
+      }
+
+      while (commitDays.has(checkDay)) {
+        streak++;
+        checkDay -= dayMs;
+      }
+      return streak;
+    } catch {
+      return 0;
+    }
+  }
+
   private async checkForNewCommit(): Promise<void> {
     try {
       const log = await this.git.log({ maxCount: 1 });

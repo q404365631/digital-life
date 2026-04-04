@@ -56,6 +56,10 @@ export class MonitorManager {
     };
   }
 
+  async getCommitStreak(): Promise<number> {
+    return this.gitWatcher.getCommitStreak();
+  }
+
   getBugCount(): number {
     return this.totalBugCount;
   }

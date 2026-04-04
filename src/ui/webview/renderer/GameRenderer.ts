@@ -26,7 +26,11 @@ export class GameRenderer {
 
   private commitEffectProgress: number = 0;
   private commitEffectStart: number = 0;
-  private readonly COMMIT_EFFECT_DURATION = 2000;
+  private readonly COMMIT_EFFECT_DURATION = 3000;
+  private commitStreak: number = 0;
+
+  // Firework particles for commit celebration
+  private fireworks: { x: number; y: number; vx: number; vy: number; color: string; born: number; life: number }[] = [];
 
   // Feed drop animation
   private feedEffects: { x: number; y: number; startTime: number }[] = [];
@@ -64,9 +68,28 @@ export class GameRenderer {
     this.uiRenderer.updateHealthCache(creatures);
   }
 
-  triggerCommitEffect(): void {
+  triggerCommitEffect(streak: number = 0): void {
     this.commitEffectProgress = 1.0;
     this.commitEffectStart = Date.now();
+    this.commitStreak = streak;
+
+    // Spawn firework particles — more for longer streaks
+    const count = 30 + Math.min(streak, 50) * 2;
+    const colors = ['#FFD700', '#FF6B6B', '#4FC3F7', '#81C784', '#CE93D8', '#FFB74D'];
+    this.fireworks = [];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.5 + Math.random() * 3;
+      this.fireworks.push({
+        x: CANVAS_WIDTH / 2 + (Math.random() - 0.5) * 100,
+        y: CANVAS_HEIGHT / 2 + (Math.random() - 0.5) * 60,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1,
+        color: colors[i % colors.length],
+        born: Date.now(),
+        life: 1500 + Math.random() * 1500,
+      });
+    }
   }
 
   triggerFeedEffect(worldX: number, worldY: number): void {
@@ -219,10 +242,11 @@ export class GameRenderer {
     // Code health report (uses cached stats)
     this.uiRenderer.renderHealthReport();
 
-    // Commit effect (UI layer)
+    // Commit celebration (UI layer)
     this.updateCommitEffect();
     if (this.commitEffectProgress > 0) {
-      this.uiRenderer.renderCommitEffect(this.commitEffectProgress);
+      this.renderFireworks();
+      this.uiRenderer.renderCommitEffect(this.commitEffectProgress, this.commitStreak);
     }
 
     // Farewell overlay (UI layer — screen dims, name floats away)
@@ -662,6 +686,41 @@ export class GameRenderer {
       this.ctx.setLineDash([]);
     }
 
+    this.ctx.restore();
+  }
+
+  private renderFireworks(): void {
+    const now = Date.now();
+    this.fireworks = this.fireworks.filter(f => now - f.born < f.life);
+
+    this.ctx.save();
+    for (const f of this.fireworks) {
+      const age = now - f.born;
+      const t = age / f.life;
+
+      // Update position with gravity
+      f.x += f.vx;
+      f.y += f.vy;
+      f.vy += 0.04; // gravity
+      f.vx *= 0.99; // drag
+
+      this.ctx.globalAlpha = (1 - t) * 0.8;
+      this.ctx.fillStyle = f.color;
+
+      // Particles shrink and leave a trail
+      const size = (1 - t) * 2.5;
+      this.ctx.beginPath();
+      this.ctx.arc(f.x, f.y, Math.max(0.3, size), 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Sparkle trail
+      if (t < 0.5) {
+        this.ctx.globalAlpha = (0.5 - t) * 0.4;
+        this.ctx.beginPath();
+        this.ctx.arc(f.x - f.vx * 2, f.y - f.vy * 2, size * 0.5, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
     this.ctx.restore();
   }
 

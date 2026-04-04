@@ -184,29 +184,69 @@ export class UIRenderer {
 
   // ── Commit celebration ──
 
-  renderCommitEffect(progress: number): void {
+  renderCommitEffect(progress: number, streak: number = 0): void {
     if (progress <= 0) return;
 
-    this.ctx.save();
-    this.ctx.globalAlpha = progress;
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
 
-    const time = Date.now() / 200;
-    this.ctx.fillStyle = '#FDD835';
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 + time;
-      const r = 30 + Math.sin(time + i) * 20;
-      this.ctx.beginPath();
-      this.ctx.arc(CANVAS_WIDTH / 2 + Math.cos(a) * r, CANVAS_HEIGHT / 2 + Math.sin(a) * r, 2, 0, Math.PI * 2);
-      this.ctx.fill();
+    this.ctx.save();
+
+    // Phase 1 (1.0→0.7): Flash + title
+    if (progress > 0.7) {
+      const flashAlpha = (progress - 0.7) / 0.3;
+      this.ctx.globalAlpha = flashAlpha * 0.15;
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 
+    // Title: "Treat time!" with glow
+    this.ctx.globalAlpha = Math.min(1, progress * 2);
+    this.ctx.textAlign = 'center';
+
+    this.ctx.shadowColor = '#FFD700';
+    this.ctx.shadowBlur = 12;
     this.ctx.fillStyle = '#FDD835';
     this.ctx.strokeStyle = '#F9A825';
     this.ctx.lineWidth = 2;
-    this.ctx.font = 'bold 14px sans-serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.strokeText(t('committed'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-    this.ctx.fillText(t('committed'), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+    this.ctx.font = 'bold 16px sans-serif';
+    this.ctx.strokeText(t('committed'), cx, cy - 30);
+    this.ctx.fillText(t('committed'), cx, cy - 30);
+    this.ctx.shadowBlur = 0;
+
+    // Streak badge (if any)
+    if (streak >= 7) {
+      this.ctx.globalAlpha = Math.min(1, progress * 2);
+      const tierColor = streak >= 100 ? '#FF4500' : streak >= 30 ? '#FFD700' : '#C0C0C0';
+      const tierLabel = streak >= 100 ? '\u{1F525} LEGEND' : streak >= 30 ? '\u{1F3C6} GOLD' : '\u2B50 SILVER';
+      this.ctx.font = 'bold 11px sans-serif';
+      this.ctx.fillStyle = tierColor;
+      this.ctx.fillText(`${tierLabel} \u2014 ${streak}-day streak`, cx, cy - 12);
+    }
+
+    // Phase 2 (0.7→0.0): Expanding ring burst
+    if (progress < 0.7) {
+      const burstProgress = 1 - progress / 0.7;
+      const ringRadius = 20 + burstProgress * 80;
+      this.ctx.globalAlpha = (1 - burstProgress) * 0.6;
+      this.ctx.strokeStyle = '#FFD700';
+      this.ctx.lineWidth = 3 - burstProgress * 2.5;
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+      this.ctx.stroke();
+
+      // Second ring (delayed)
+      if (burstProgress > 0.2) {
+        const ring2 = (burstProgress - 0.2) / 0.8;
+        const r2 = 15 + ring2 * 90;
+        this.ctx.globalAlpha = (1 - ring2) * 0.3;
+        this.ctx.strokeStyle = '#FF8A65';
+        this.ctx.lineWidth = 2 - ring2 * 1.5;
+        this.ctx.beginPath();
+        this.ctx.arc(cx, cy, r2, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+    }
 
     this.ctx.restore();
   }

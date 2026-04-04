@@ -378,7 +378,7 @@ window.addEventListener('message', (event: MessageEvent<ExtToWebMessage>) => {
     }
 
     case 'commitDetected':
-      renderer.triggerCommitEffect();
+      renderer.triggerCommitEffect(message.stats?.streak ?? 0);
       soundEngine.playCommit();
       break;
 

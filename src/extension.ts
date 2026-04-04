@@ -399,12 +399,26 @@ export function activate(context: vscode.ExtensionContext): void {
       creatureManager.feedAll();
       const leveledUp = creatureManager.commitBonus();
       worldState = updateWeather(worldState, 0);
-      panelProvider.postMessage({ type: 'commitDetected' });
+
+      // Fetch commit streak asynchronously, then send celebration
+      void monitorManager.getCommitStreak().then(streak => {
+        panelProvider.postMessage({
+          type: 'commitDetected',
+          stats: { insertions: 0, deletions: 0, filesChanged: 0, streak },
+        });
+
+        // Update streak in status bar
+        if (streak >= 7) {
+          const tier = streak >= 100 ? '\u{1F525}' : streak >= 30 ? '\u{1F3C6}' : '\u2B50';
+          statusBarItem.text = `\u{1F33F} ${tier} ${streak}-day streak!`;
+        }
+      });
+
       for (const id of leveledUp) {
         panelProvider.postMessage({ type: 'levelUp', creatureId: id });
-        broadcastSpeech('levelUp', id); // Feature A: living words on level up
+        broadcastSpeech('levelUp', id);
       }
-      broadcastSpeech('commit'); // Feature A: living words on commit
+      broadcastSpeech('commit');
       syncAndSave();
       void dnaAnalyzer.analyze().then(dna => { currentDNA = dna; });
     },

@@ -111,6 +111,15 @@ export interface WorldData {
   readonly graveStones: readonly GraveStone[];
 }
 
+// --- Commit ---
+
+export interface CommitStats {
+  readonly insertions: number;
+  readonly deletions: number;
+  readonly filesChanged: number;
+  readonly streak: number;
+}
+
 // --- Monitor ---
 
 export interface MonitorState {
@@ -126,7 +135,7 @@ export type ExtToWebMessage =
   | { readonly type: 'worldUpdate'; readonly creatures: readonly CreatureData[]; readonly world: WorldData; readonly bugs: number; readonly agents: readonly AgentData[] }
   | { readonly type: 'creatureBorn'; readonly creature: CreatureData }
   | { readonly type: 'creatureDied'; readonly creatureId: string; readonly creatureName: string }
-  | { readonly type: 'commitDetected' }
+  | { readonly type: 'commitDetected'; readonly stats?: CommitStats }
   | { readonly type: 'bugCountChanged'; readonly count: number }
   | { readonly type: 'agentChat'; readonly agentId: string; readonly message: string }
   | { readonly type: 'aiActionPreview'; readonly creatureId: string; readonly action: string; readonly description: string }
