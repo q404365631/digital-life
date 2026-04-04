@@ -309,7 +309,82 @@ export class GameRenderer {
 
     this.ctx.save();
 
-    if (rw === 'snow') {
+    if (rw === 'rain') {
+      // Dark sky tint
+      this.ctx.globalAlpha = 0.12;
+      this.ctx.fillStyle = '#1a1a2e';
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Rain clouds (dark, heavy)
+      this.ctx.globalAlpha = 0.5;
+      this.ctx.fillStyle = '#555';
+      this.drawRainCloud(20, 2, 90, 18);
+      this.drawRainCloud(130, 6, 80, 16);
+      this.drawRainCloud(260, 0, 100, 20);
+      this.drawRainCloud(380, 4, 70, 15);
+
+      // Raindrops — angled, streaky, layered
+      const t1 = time / 80;
+      // Heavy rain layer (fast, long streaks)
+      this.ctx.strokeStyle = '#7CB9E8';
+      this.ctx.lineWidth = 1.2;
+      this.ctx.globalAlpha = 0.45;
+      for (let i = 0; i < 50; i++) {
+        const rx = (i * 11.3 + t1 * 3.7) % (CANVAS_WIDTH + 40) - 20;
+        const ry = (i * 17.9 + t1 * 5.2) % CANVAS_HEIGHT;
+        this.ctx.beginPath();
+        this.ctx.moveTo(rx, ry);
+        this.ctx.lineTo(rx - 3, ry + 12);
+        this.ctx.stroke();
+      }
+      // Light rain layer (slow, short streaks, faint)
+      this.ctx.lineWidth = 0.8;
+      this.ctx.globalAlpha = 0.25;
+      for (let i = 0; i < 30; i++) {
+        const rx = (i * 19.7 + t1 * 2.1) % (CANVAS_WIDTH + 20) - 10;
+        const ry = (i * 23.3 + t1 * 3.8) % CANVAS_HEIGHT;
+        this.ctx.beginPath();
+        this.ctx.moveTo(rx, ry);
+        this.ctx.lineTo(rx - 2, ry + 8);
+        this.ctx.stroke();
+      }
+
+      // Splash particles at bottom
+      this.ctx.globalAlpha = 0.3;
+      this.ctx.fillStyle = '#7CB9E8';
+      for (let i = 0; i < 8; i++) {
+        const sx = (i * 61 + time * 0.05) % CANVAS_WIDTH;
+        const splash = Math.sin(time / 200 + i * 2.3) * 0.5 + 0.5;
+        if (splash > 0.7) {
+          const sy = CANVAS_HEIGHT - 10 - Math.random() * 5;
+          this.ctx.beginPath();
+          this.ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+          this.ctx.fill();
+          // Tiny splash lines
+          this.ctx.strokeStyle = '#7CB9E8';
+          this.ctx.lineWidth = 0.5;
+          this.ctx.beginPath();
+          this.ctx.moveTo(sx - 3, sy);
+          this.ctx.lineTo(sx - 5, sy - 3);
+          this.ctx.moveTo(sx + 3, sy);
+          this.ctx.lineTo(sx + 5, sy - 3);
+          this.ctx.stroke();
+        }
+      }
+    } else if (rw === 'cloudy') {
+      // Overcast tint
+      this.ctx.globalAlpha = 0.06;
+      this.ctx.fillStyle = '#666';
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Drifting clouds
+      this.ctx.globalAlpha = 0.35;
+      this.ctx.fillStyle = '#999';
+      const drift = time * 0.005;
+      this.drawRainCloud((40 + drift) % (CANVAS_WIDTH + 100) - 50, 5, 90, 18);
+      this.drawRainCloud((180 + drift * 0.7) % (CANVAS_WIDTH + 100) - 50, 10, 80, 16);
+      this.drawRainCloud((320 + drift * 1.2) % (CANVAS_WIDTH + 100) - 50, 2, 100, 20);
+    } else if (rw === 'snow') {
       // Gentle snowflakes
       this.ctx.fillStyle = '#FFFFFF';
       this.ctx.globalAlpha = 0.6;
@@ -329,9 +404,24 @@ export class GameRenderer {
       this.ctx.fillRect(0, CANVAS_HEIGHT * 0.3 + drift, CANVAS_WIDTH, 40);
       this.ctx.fillRect(0, CANVAS_HEIGHT * 0.6 - drift, CANVAS_WIDTH, 30);
     }
-    // rain and cloudy are already handled by the bug-based weather system
 
     this.ctx.restore();
+  }
+
+  /** Rounded cloud shape for rain/cloudy overlays */
+  private drawRainCloud(x: number, y: number, w: number, h: number): void {
+    this.ctx.beginPath();
+    // Cloud: overlapping ellipses
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    this.ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.beginPath();
+    this.ctx.ellipse(cx - w * 0.25, cy - h * 0.15, w * 0.3, h * 0.4, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.beginPath();
+    this.ctx.ellipse(cx + w * 0.2, cy - h * 0.1, w * 0.35, h * 0.45, 0, 0, Math.PI * 2);
+    this.ctx.fill();
   }
 
   private renderChatBubble(x: number, y: number, message: string): void {
