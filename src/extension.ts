@@ -16,6 +16,7 @@ import { MAX_CREATURES, MS_PER_DAY, NESTING_THRESHOLD, FUNCTION_LENGTH_THRESHOLD
 import { AgentManager } from './agent/AgentManager';
 import { getPersonality, pickSpeech, SpeechEvent } from './ai/SpeechTemplates';
 import { analyzeFriendships } from './monitor/ImportAnalyzer';
+import { AutoCareManager, AutoCareConfig, AutoCareLogEntry } from './autoCare/AutoCareManager';
 
 const TICK_INTERVAL = 200; // ms
 
@@ -288,6 +289,69 @@ export function activate(context: vscode.ExtensionContext): void {
     } catch {
       // Import analysis failed silently
     }
+  }
+
+  // ── Feature F: Auto-Care（自動餌やり） ──────────────────────
+  function getAutoCareConfig(): AutoCareConfig {
+    const config = vscode.workspace.getConfiguration('digitalLife');
+    return {
+      enabled: config.get<boolean>('autoCare.enabled', false),
+      intervalMinutes: config.get<number>('autoCare.intervalMinutes', 30),
+      healthThreshold: config.get<number>('autoCare.healthThreshold', 50),
+    };
+  }
+
+  const autoCareManager = new AutoCareManager(creatureManager, getAutoCareConfig());
+
+  /** 自動餌やり実行後の通知・保存処理 */
+  function handleAutoCareResults(results: AutoCareLogEntry[]): void {
+    if (results.length === 0) {
+      return;
+    }
+
+    for (const entry of results) {
+      // VS Code通知で結果を表示
+      const message = speechLang === 'ja'
+        ? `${entry.creatureName} が自動お世話を受けました。HP: ${entry.hpBefore}% → ${entry.hpAfter}%`
+        : `${entry.creatureName} received auto-care. HP: ${entry.hpBefore}% → ${entry.hpAfter}%`;
+      void vscode.window.showInformationMessage(`\uD83C\uDF3F ${message}`);
+
+      // 出力チャンネルにログ記録
+      outputChannel.appendLine(
+        `[Auto-Care] ${new Date(entry.timestamp).toISOString()} | ` +
+        `${entry.creatureName} | ${entry.action} | ` +
+        `HP: ${entry.hpBefore}% → ${entry.hpAfter}% | ${entry.description}`
+      );
+
+      // パネルにも通知
+      panelProvider.postMessage({
+        type: 'creatureSpeech',
+        creatureId: entry.creatureId,
+        text: speechLang === 'ja'
+          ? `自動お世話: ${entry.description}`
+          : `Auto-care: ${entry.description}`,
+      });
+    }
+
+    // 状態を保存
+    syncAndSave();
+  }
+
+  // 自動餌やりタイマーのラッパー（結果ハンドリング付き）
+  // AutoCareManager内部のrunAutoCareを上書きして通知を追加
+  {
+    const originalRunAutoCare = autoCareManager.runAutoCare.bind(autoCareManager);
+    autoCareManager.runAutoCare = (): AutoCareLogEntry[] => {
+      const results = originalRunAutoCare();
+      handleAutoCareResults(results);
+      return results;
+    };
+  }
+
+  // 設定が有効なら自動餌やりを開始
+  if (getAutoCareConfig().enabled) {
+    autoCareManager.start();
+    outputChannel.appendLine('[Auto-Care] 自動餌やりモードが有効です');
   }
 
   // ── Feature E: Proactive creature suggestions ───────────────
@@ -616,8 +680,25 @@ export function activate(context: vscode.ExtensionContext): void {
       case 'revealFile': {
         const revealCreature = creatureManager.getById(message.creatureId);
         if (revealCreature) {
-          const uri = vscode.Uri.file(revealCreature.sourceFile);
-          void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+          const fileExt = revealCreature.sourceFile.split('.').pop()?.toLowerCase() ?? '';
+          if (fileExt === 'html' || fileExt === 'htm') {
+            // HTMLファイルの場合、ブラウザで開くか確認
+            void vscode.window.showInformationMessage(
+              `「${path.basename(revealCreature.sourceFile)}」をブラウザで開きますか？`,
+              'ブラウザで開く', 'エディタで開く'
+            ).then((choice) => {
+              if (choice === 'ブラウザで開く') {
+                const fileUri = vscode.Uri.file(revealCreature.sourceFile);
+                void vscode.env.openExternal(fileUri);
+              } else if (choice === 'エディタで開く') {
+                const uri = vscode.Uri.file(revealCreature.sourceFile);
+                void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+              }
+            });
+          } else {
+            const uri = vscode.Uri.file(revealCreature.sourceFile);
+            void vscode.commands.executeCommand('vscode.open', uri, { preview: true });
+          }
         }
         return true;
       }
@@ -1106,6 +1187,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('digitalLife')) {
         sendSettings();
+        // 自動餌やり設定の更新
+        if (e.affectsConfiguration('digitalLife.autoCare')) {
+          const newConfig = getAutoCareConfig();
+          autoCareManager.updateConfig(newConfig);
+          outputChannel.appendLine(
+            `[Auto-Care] 設定更新: enabled=${newConfig.enabled}, ` +
+            `interval=${newConfig.intervalMinutes}min, threshold=${newConfig.healthThreshold}%`
+          );
+        }
       }
     })
   );
@@ -1259,6 +1349,7 @@ export function activate(context: vscode.ExtensionContext): void {
       stopTickTimer();
       clearInterval(saveTimer);
       monitorManager.stop();
+      autoCareManager.stop();
       saveState();
     },
   });
@@ -1355,6 +1446,57 @@ export function activate(context: vscode.ExtensionContext): void {
       sendWorldUpdate();
       syncAndSave();
       vscode.window.showInformationMessage('Digital Life: Gravestones cleared');
+    })
+  );
+
+  // ── Auto-Care コマンド ──
+  context.subscriptions.push(
+    vscode.commands.registerCommand('digitalLife.toggleAutoCare', () => {
+      const config = vscode.workspace.getConfiguration('digitalLife');
+      const currentEnabled = config.get<boolean>('autoCare.enabled', false);
+      const newEnabled = !currentEnabled;
+      void config.update('autoCare.enabled', newEnabled, vscode.ConfigurationTarget.Global);
+      const message = newEnabled
+        ? '\uD83C\uDF3F Auto-Care: 自動餌やりモードをONにしました'
+        : '\uD83C\uDF3F Auto-Care: 自動餌やりモードをOFFにしました';
+      void vscode.window.showInformationMessage(message);
+      outputChannel.appendLine(`[Auto-Care] ${newEnabled ? 'ON' : 'OFF'}`);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('digitalLife.runAutoCareNow', () => {
+      const results = autoCareManager.runAutoCare();
+      if (results.length === 0) {
+        const message = speechLang === 'ja'
+          ? '\uD83C\uDF3F Auto-Care: お世話が必要な生き物はいません'
+          : '\uD83C\uDF3F Auto-Care: No creatures need care right now';
+        void vscode.window.showInformationMessage(message);
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('digitalLife.showAutoCareLog', () => {
+      const log = autoCareManager.getLog();
+      if (log.length === 0) {
+        void vscode.window.showInformationMessage('\uD83C\uDF3F Auto-Care: 履歴はまだありません');
+        return;
+      }
+
+      // 出力チャンネルにログを表示
+      outputChannel.appendLine('');
+      outputChannel.appendLine('=== Auto-Care 履歴 ===');
+      for (const entry of log) {
+        const time = new Date(entry.timestamp).toLocaleString();
+        outputChannel.appendLine(
+          `[${time}] ${entry.creatureName} | ${entry.action} | ` +
+          `HP: ${entry.hpBefore}% → ${entry.hpAfter}% | ${entry.description}`
+        );
+      }
+      outputChannel.appendLine(`=== 合計 ${log.length} 件 ===`);
+      outputChannel.appendLine('');
+      outputChannel.show(true);
     })
   );
 

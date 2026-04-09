@@ -13,7 +13,7 @@
   "bugs": {
     "url": "https://github.com/teamshikakeru-glitch/digital-life/issues"
   },
-  "preview": true,
+  "preview": false,
   "galleryBanner": {
     "color": "#1A1A1A",
     "theme": "dark"
@@ -73,6 +73,18 @@
       {
         "command": "digitalLife.clearGraves",
         "title": "Digital Life: Clear Gravestones"
+      },
+      {
+        "command": "digitalLife.toggleAutoCare",
+        "title": "Digital Life: Toggle Auto-Care (自動餌やり)"
+      },
+      {
+        "command": "digitalLife.runAutoCareNow",
+        "title": "Digital Life: Run Auto-Care Now (今すぐ自動餌やり)"
+      },
+      {
+        "command": "digitalLife.showAutoCareLog",
+        "title": "Digital Life: Show Auto-Care Log (自動餌やり履歴)"
       }
     ],
     "configuration": {
@@ -98,6 +110,25 @@
           "type": "boolean",
           "default": true,
           "description": "Show sparkle effect when files are saved"
+        },
+        "digitalLife.autoCare.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable auto-care mode (自動餌やりモード). Automatically feeds and cares for creatures when their HP drops below threshold."
+        },
+        "digitalLife.autoCare.intervalMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 1440,
+          "description": "Auto-care check interval in minutes (自動餌やりの間隔). Default: 30 minutes."
+        },
+        "digitalLife.autoCare.healthThreshold": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "HP threshold for auto-care (自動餌やりのHP閾値). Creatures with HP at or below this value will be automatically cared for. Default: 50."
         }
       }
     }

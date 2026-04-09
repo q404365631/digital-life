@@ -115,7 +115,7 @@ export class MonitorManager {
     const sourceExtensions = [
       'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'rs', 'java',
       'rb', 'php', 'swift', 'kt', 'cs', 'c', 'cpp', 'h',
-      'vue', 'svelte',
+      'vue', 'svelte', 'html', 'css', 'json', 'md',
     ];
     if (!sourceExtensions.includes(ext)) return false;
 
