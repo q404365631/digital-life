@@ -1,6 +1,6 @@
 {
-  "name": "shikakeru-digital-life",
-  "displayName": "Digital Life by SHIKAKERU",
+  "name": "digital-life",
+  "displayName": "Digital Life - Code Creatures",
   "description": "Your code becomes a world. Digital creatures live in your VS Code, reflecting the health of your codebase. Uses ipinfo.io for geolocation and Open-Meteo for weather data (no API key required, no personal data stored).",
   "version": "0.1.0",
   "publisher": "shikakeru",
@@ -13,6 +13,7 @@
   "bugs": {
     "url": "https://github.com/teamshikakeru-glitch/digital-life/issues"
   },
+  "icon": "assets/icon.png",
   "preview": false,
   "galleryBanner": {
     "color": "#1A1A1A",
