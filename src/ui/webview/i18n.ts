@@ -265,6 +265,9 @@ const dict: Record<Language, Dict> = {
     guide_feed:       '看起来好饿 — 试试喂食吧！',
     guide_fed:        '太好了！精神好多了',
     guide_care:       '不舒服的时候，用「照顾」帮帮它',
+    guide_screenshot: '试试截图按钮记录美好瞬间！',
+    guide_starve:     '别忘了喂食 — 3天不喂食就会离开...',
+    guide_mutation:  '升到Lv.5解锁特别变异！',
 
     personality:      '性格',
     trait_active:     '活泼',
